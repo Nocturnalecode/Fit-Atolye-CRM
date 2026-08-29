@@ -3,8 +3,9 @@ import { Link } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { api, formatError } from "../lib/api";
 import { useAuth, formatDateTR, todayISO } from "../lib/auth";
+import { whatsappLink } from "../lib/whatsapp";
 import { toast } from "sonner";
-import { Plus, LayoutGrid, List, Search, X, Filter } from "lucide-react";
+import { Plus, LayoutGrid, List, Search, X, Filter, MessageCircle } from "lucide-react";
 
 export default function Leads() {
   const { user, isAdmin } = useAuth();
@@ -138,26 +139,41 @@ export default function Leads() {
                       <div ref={provided.innerRef} {...provided.droppableProps} className="min-h-[100px]">
                         {items.map((p, idx) => (
                           <Draggable key={p.id} draggableId={p.id} index={idx}>
-                            {(prov, snap) => (
-                              <Link
-                                to={`/leads/${p.id}`}
+                            {(prov, snap) => {
+                              const wa = whatsappLink(p.phone, p.name, userName(p.assigned_to));
+                              return (
+                              <div
                                 ref={prov.innerRef}
                                 {...prov.draggableProps}
                                 {...prov.dragHandleProps}
                                 data-testid={`lead-card-${p.id}`}
-                                className={`block kanban-card ${snap.isDragging ? "dragging" : ""}`}
+                                className={`kanban-card relative ${snap.isDragging ? "dragging" : ""}`}
                               >
-                                <div className="flex items-start justify-between gap-2 mb-1.5">
-                                  <div className="font-semibold text-sm text-[#111827]">{p.name}</div>
-                                  {p.priority === "high" && <span className="badge-soft bg-red-100 text-red-700">Yüksek</span>}
-                                </div>
-                                <div className="text-xs text-[#6B7280] space-y-0.5">
-                                  <div>{sourceName(p.source_id)}</div>
-                                  <div>{userName(p.assigned_to)}</div>
-                                  {p.next_followup_date && <div className="text-[#065F46]">Takip: {formatDateTR(p.next_followup_date)}</div>}
-                                </div>
-                              </Link>
-                            )}
+                                <Link to={`/leads/${p.id}`} className="block">
+                                  <div className="flex items-start justify-between gap-2 mb-1.5 pr-7">
+                                    <div className="font-semibold text-sm text-[#111827]">{p.name}</div>
+                                    {p.priority === "high" && <span className="badge-soft bg-red-100 text-red-700">Yüksek</span>}
+                                  </div>
+                                  <div className="text-xs text-[#6B7280] space-y-0.5">
+                                    <div>{sourceName(p.source_id)}</div>
+                                    <div>{userName(p.assigned_to)}</div>
+                                    {p.next_followup_date && <div className="text-[#065F46]">Takip: {formatDateTR(p.next_followup_date)}</div>}
+                                  </div>
+                                </Link>
+                                {wa && (
+                                  <a
+                                    href={wa} target="_blank" rel="noreferrer"
+                                    onClick={(e) => e.stopPropagation()}
+                                    className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#25D366] hover:bg-[#1FB558] flex items-center justify-center text-white transition-colors"
+                                    title={`WhatsApp: ${p.phone}`}
+                                    data-testid={`wa-btn-${p.id}`}
+                                  >
+                                    <MessageCircle className="w-3.5 h-3.5" />
+                                  </a>
+                                )}
+                              </div>
+                              );
+                            }}
                           </Draggable>
                         ))}
                         {provided.placeholder}
@@ -176,11 +192,13 @@ export default function Leads() {
               <tr>
                 {isAdmin && <th style={{width:30}}></th>}
                 <th>Ad Soyad</th><th>Telefon</th><th>Kaynak</th><th>Aşama</th>
-                <th>Danışman</th><th>Öncelik</th><th>Takip</th>
+                <th>Danışman</th><th>Öncelik</th><th>Takip</th><th style={{width:60}}>WA</th>
               </tr>
             </thead>
             <tbody>
-              {persons.map((p) => (
+              {persons.map((p) => {
+                const wa = whatsappLink(p.phone, p.name, userName(p.assigned_to));
+                return (
                 <tr key={p.id}>
                   {isAdmin && (
                     <td>
@@ -198,9 +216,17 @@ export default function Leads() {
                     </span>
                   </td>
                   <td className="text-sm text-[#6B7280]">{formatDateTR(p.next_followup_date)}</td>
+                  <td>
+                    {wa ? (
+                      <a href={wa} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#25D366] hover:bg-[#1FB558] text-white" title={`WhatsApp: ${p.phone}`} data-testid={`wa-row-${p.id}`}>
+                        <MessageCircle className="w-3.5 h-3.5" />
+                      </a>
+                    ) : <span className="text-xs text-[#9CA3AF]">-</span>}
+                  </td>
                 </tr>
-              ))}
-              {persons.length === 0 && <tr><td colSpan="8" className="text-center py-10 text-[#6B7280]">Henüz veri yok. Yeni Talep ile başlayın.</td></tr>}
+                );
+              })}
+              {persons.length === 0 && <tr><td colSpan="9" className="text-center py-10 text-[#6B7280]">Henüz veri yok. Yeni Talep ile başlayın.</td></tr>}
             </tbody>
           </table>
         </div>
