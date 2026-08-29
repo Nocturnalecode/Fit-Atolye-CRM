@@ -423,12 +423,41 @@ async def list_ref(kind: str, current=Depends(current_user_dep)):
 async def create_ref(kind: str, body: Dict[str, Any], current=Depends(current_user_dep)):
     require_admin(current)
     col = _ref_collection(kind)
-    doc = {"id": new_id(), "active": True, **body}
+    doc = {"active": True, **body}
+    # If caller supplied an id (e.g. restore/undo), keep it; otherwise generate
+    if not doc.get("id"):
+        doc["id"] = new_id()
+    else:
+        # Prevent duplicate id
+        existing = await col.find_one({"id": doc["id"]})
+        if existing:
+            raise HTTPException(400, "Aynı ID zaten mevcut")
     if kind == "stages" and "order" not in body:
         doc["order"] = await col.count_documents({}) + 1
     await col.insert_one(doc)
     doc.pop("_id", None)
     return doc
+
+
+@api.get("/ref/{kind}/{item_id}/usage")
+async def ref_usage(kind: str, item_id: str, current=Depends(current_user_dep)):
+    require_admin(current)
+    _ref_collection(kind)  # validates kind
+    total = 0
+    breakdown: Dict[str, int] = {}
+    if kind == "sources":
+        n = await db.persons.count_documents({"source_id": item_id}); breakdown["persons"] = n; total += n
+    elif kind == "stages":
+        n = await db.persons.count_documents({"sales_stage_id": item_id}); breakdown["persons"] = n; total += n
+    elif kind == "response_categories":
+        n1 = await db.persons.count_documents({"response_category_id": item_id})
+        n2 = await db.contacts.count_documents({"response_category_id": item_id})
+        breakdown["persons"] = n1; breakdown["contacts"] = n2; total = n1 + n2
+    elif kind == "negative_reasons":
+        n = await db.persons.count_documents({"negative_reason_id": item_id}); breakdown["persons"] = n; total += n
+    elif kind == "tags":
+        n = await db.persons.count_documents({"tags": item_id}); breakdown["persons"] = n; total += n
+    return {"total": total, "breakdown": breakdown}
 
 
 @api.patch("/ref/{kind}/{item_id}")

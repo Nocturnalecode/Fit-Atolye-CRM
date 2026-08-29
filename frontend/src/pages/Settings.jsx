@@ -21,9 +21,10 @@ export default function Settings() {
   const [showUser, setShowUser] = useState(false);
   const [waTemplates, setWaTemplates] = useState([]);
   const [waEditing, setWaEditing] = useState(null);
+  const [selected, setSelected] = useState([]); // ids
 
   const isRef = REFS.map(([k]) => k).includes(active);
-  const load = () => { if (isRef) api.get(`/ref/${active}`).then((r) => setItems(r.data)); };
+  const load = () => { if (isRef) { api.get(`/ref/${active}`).then((r) => setItems(r.data)); setSelected([]); } };
   const loadWa = () => api.get("/wa-templates").then((r) => setWaTemplates(r.data));
   useEffect(() => { load(); if (active === "wa") loadWa(); }, [active]); // eslint-disable-line
   useEffect(() => {
@@ -42,6 +43,80 @@ export default function Settings() {
     await api.patch(`/ref/${active}/${it.id}`, { active: !it.active });
     load();
   };
+
+  // Restore one or many previously-deleted ref items (for undo)
+  const restore = async (kind, snapshots) => {
+    try {
+      for (const s of snapshots) {
+        await api.post(`/ref/${kind}`, s);
+      }
+      toast.success(snapshots.length > 1 ? `${snapshots.length} kayıt geri alındı` : "Geri alındı");
+      if (kind === active) load();
+    } catch (e) {
+      toast.error(formatError(e.response?.data?.detail));
+    }
+  };
+
+  const deleteWithUndo = async (it) => {
+    // Fetch usage first
+    let usageText = "";
+    try {
+      const { data } = await api.get(`/ref/${active}/${it.id}/usage`);
+      if (data.total > 0) {
+        usageText = `\n\n⚠ Bu kayıt ${data.total} yerde kullanılıyor. Silmek eski kayıtları etkileyebilir.`;
+      }
+    } catch (_) {}
+    if (!window.confirm(`"${it.name}" kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.${usageText}`)) return;
+    // Snapshot then delete
+    const snapshot = { id: it.id, name: it.name, active: it.active };
+    if (it.order != null) snapshot.order = it.order;
+    if (it.auto_task_days != null) snapshot.auto_task_days = it.auto_task_days;
+    if (it.auto_enabled != null) snapshot.auto_enabled = it.auto_enabled;
+    const kind = active;
+    try {
+      await api.delete(`/ref/${kind}/${it.id}`);
+      load();
+      toast.success(`"${it.name}" silindi`, {
+        duration: 5000,
+        action: { label: "Geri Al", onClick: () => restore(kind, [snapshot]) },
+      });
+    } catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+  };
+
+  const bulkDelete = async () => {
+    if (selected.length === 0) return;
+    // Aggregate usage
+    let totalUsage = 0;
+    try {
+      const results = await Promise.all(selected.map((id) => api.get(`/ref/${active}/${id}/usage`).then((r) => r.data.total).catch(() => 0)));
+      totalUsage = results.reduce((a, b) => a + b, 0);
+    } catch (_) {}
+    const suffix = totalUsage > 0 ? `\n\n⚠ Seçili kayıtlar toplam ${totalUsage} yerde kullanılıyor.` : "";
+    if (!window.confirm(`${selected.length} kayıt silinsin mi? Bu işlem geri alınamaz.${suffix}`)) return;
+    const snapshots = items.filter((it) => selected.includes(it.id)).map((it) => {
+      const s = { id: it.id, name: it.name, active: it.active };
+      if (it.order != null) s.order = it.order;
+      if (it.auto_task_days != null) s.auto_task_days = it.auto_task_days;
+      if (it.auto_enabled != null) s.auto_enabled = it.auto_enabled;
+      return s;
+    });
+    const kind = active;
+    try {
+      for (const id of selected) {
+        await api.delete(`/ref/${kind}/${id}`);
+      }
+      const count = selected.length;
+      setSelected([]);
+      load();
+      toast.success(`${count} kayıt silindi`, {
+        duration: 5000,
+        action: { label: "Geri Al", onClick: () => restore(kind, snapshots) },
+      });
+    } catch (e) { toast.error(formatError(e.response?.data?.detail)); load(); }
+  };
+
+  const toggleOne = (id) => setSelected((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+  const toggleAll = () => setSelected(selected.length === items.length ? [] : items.map((i) => i.id));
 
   if (!isAdmin) return <div className="p-8 text-[#6B7280]">Sadece yönetici erişebilir.</div>;
 
@@ -62,25 +137,48 @@ export default function Settings() {
             <input className="flex-1 border rounded-lg px-3 py-2 text-sm" placeholder="Yeni ekle..." value={newName} onChange={(e) => setNewName(e.target.value)} data-testid="ref-input" />
             <button className="btn-primary" onClick={addItem} data-testid="ref-add">Ekle</button>
           </div>
+
+          {items.length > 0 && (
+            <div className="flex items-center justify-between mb-3 px-1">
+              <label className="flex items-center gap-2 text-xs text-[#6B7280]">
+                <input
+                  type="checkbox"
+                  checked={selected.length === items.length && items.length > 0}
+                  onChange={toggleAll}
+                  data-testid="ref-select-all"
+                />
+                <span>Tümünü seç</span>
+              </label>
+              {selected.length > 0 && (
+                <button
+                  className="text-xs font-semibold text-red-600 hover:text-red-800 underline"
+                  onClick={bulkDelete}
+                  data-testid="ref-bulk-delete"
+                >
+                  Seçilenleri Sil ({selected.length})
+                </button>
+              )}
+            </div>
+          )}
+
           <div className="space-y-2">
             {items.map((it) => (
-              <div key={it.id} className="flex justify-between items-center p-3 border rounded-lg">
-                <span className={it.active ? "" : "text-[#9CA3AF] line-through"}>{it.name}</span>
+              <div key={it.id} className={`flex justify-between items-center p-3 border rounded-lg ${selected.includes(it.id) ? "bg-[#F0FDF4] border-emerald-200" : ""}`}>
+                <label className="flex items-center gap-3 flex-1 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selected.includes(it.id)}
+                    onChange={() => toggleOne(it.id)}
+                    data-testid={`ref-select-${it.id}`}
+                  />
+                  <span className={it.active ? "" : "text-[#9CA3AF] line-through"}>{it.name}</span>
+                </label>
                 <div className="flex gap-3 items-center">
                   <button className="btn-ghost text-xs" onClick={() => toggle(it)}>{it.active ? "Pasife Al" : "Aktif Yap"}</button>
                   <button
                     className="text-xs underline text-red-600 hover:text-red-800"
                     data-testid={`delete-ref-${it.id}`}
-                    onClick={async () => {
-                      if (!window.confirm(`"${it.name}" kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) return;
-                      try {
-                        await api.delete(`/ref/${active}/${it.id}`);
-                        toast.success("Silindi");
-                        load();
-                      } catch (e) {
-                        toast.error(formatError(e.response?.data?.detail));
-                      }
-                    }}
+                    onClick={() => deleteWithUndo(it)}
                   >Sil</button>
                 </div>
               </div>
