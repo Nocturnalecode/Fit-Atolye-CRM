@@ -556,6 +556,31 @@ async def list_persons(
     return docs
 
 
+# --- Referrals ---
+@api.get("/persons/referrals/counts")
+async def referral_counts(current=Depends(current_user_dep)):
+    # Aggregate referral counts grouped by referrer id
+    pipeline = [
+        {"$match": {"referred_by_person_id": {"$ne": None}}},
+        {"$group": {"_id": "$referred_by_person_id", "count": {"$sum": 1}}},
+    ]
+    counts: Dict[str, int] = {}
+    async for doc in db.persons.aggregate(pipeline):
+        if doc.get("_id"):
+            counts[doc["_id"]] = doc["count"]
+    return counts
+
+
+@api.get("/persons/{pid}/referrals")
+async def person_referrals(pid: str, current=Depends(current_user_dep)):
+    # Anyone who can see the person can see who they referred; scope by role
+    filt: dict = {"referred_by_person_id": pid}
+    if current.get("role") != "admin":
+        filt["assigned_to"] = current["id"]
+    docs = await db.persons.find(filt, {"_id": 0, "id": 1, "name": 1, "phone": 1, "lifecycle_status": 1, "customer_since": 1, "request_date": 1}).sort("request_date", -1).to_list(500)
+    return docs
+
+
 @api.get("/persons/{pid}")
 async def get_person(pid: str, current=Depends(current_user_dep)):
     p = await db.persons.find_one({"id": pid}, {"_id": 0})

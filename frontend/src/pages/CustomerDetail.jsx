@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, formatError } from "../lib/api";
 import { formatDateTR, formatTRY, todayISO, useAuth, calcAge } from "../lib/auth";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Users as UsersIcon, Star } from "lucide-react";
 import ReferralPicker from "../components/ReferralPicker";
 
 const TABS = ["Genel Bakış", "İletişim", "Üyelikler", "Ödemeler", "Ölçümler", "Randevular", "Ürün Satışları", "Notlar"];
@@ -24,6 +24,7 @@ export default function CustomerDetail() {
   const [contacts, setContacts] = useState([]);
   const [sources, setSources] = useState([]);
   const [referrerName, setReferrerName] = useState("");
+  const [referrals, setReferrals] = useState([]);
   const [modal, setModal] = useState(null);
 
   const load = async () => {
@@ -42,6 +43,11 @@ export default function CustomerDetail() {
     setP(pr.data); setFin(f.data); setMemberships(m.data); setPayments(py.data);
     setMeasurements(me.data); setAppointments(ap.data); setSales(s.data);
     setProducts(pr2.data); setContacts(ct.data); setSources(src.data);
+    // load who this person referred
+    try {
+      const { data: refs } = await api.get(`/persons/${id}/referrals`);
+      setReferrals(refs);
+    } catch { setReferrals([]); }
     if (pr.data.referred_by_person_id) {
       try {
         const { data: refData } = await api.get(`/persons/${pr.data.referred_by_person_id}`);
@@ -76,7 +82,7 @@ export default function CustomerDetail() {
         <SumCard label="Üyelik Bitişi" value={formatDateTR(activeMem?.end_date)} />
         <SumCard label="Son Ölçüm Kilo" value={lastMeas?.weight ? `${lastMeas.weight} kg` : "-"} sub={prevMeas?.weight ? `Δ ${(lastMeas.weight - prevMeas.weight).toFixed(1)} kg` : ""} />
         <SumCard label="Ödenmemiş" value={formatTRY(financial?.total_receivable || 0)} />
-        <SumCard label="Toplam Ödeme" value={formatTRY((financial?.paid_membership || 0) + (financial?.paid_product || 0))} />
+        <SumCard label="Getirdiği Referans" value={referrals.length} sub={referrals.length > 0 ? "🌟 referans veren müşteri" : ""} />
       </div>
 
       <div className="pill-tabs mb-5">
@@ -86,7 +92,8 @@ export default function CustomerDetail() {
       </div>
 
       {tab === "Genel Bakış" && (
-        <div className="bg-white border border-[#E5E7EB] rounded-xl p-5 space-y-2 text-sm">
+        <div className="space-y-4">
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-5 space-y-2 text-sm">
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <Info label="Durum" v={p.lifecycle_status} />
             <Info label="Müşteri Olma" v={formatDateTR(p.customer_since)} />
@@ -157,6 +164,42 @@ export default function CustomerDetail() {
               </div>
             </div>
           )}
+        </div>
+
+          <div className="bg-white border border-[#E5E7EB] rounded-xl p-5" data-testid="referral-tree">
+            <div className="flex items-center gap-2 mb-3">
+              <UsersIcon className="w-4 h-4 text-[#065F46]" />
+              <h4 className="font-bold" style={{fontFamily:'Manrope'}}>Bu müşteri {referrals.length} kişiyi getirdi</h4>
+              {referrals.length > 0 && (
+                <div className="flex items-center gap-0.5">
+                  {Array.from({ length: Math.min(referrals.length, 5) }).map((_, i) => (
+                    <Star key={i} className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                  ))}
+                  {referrals.length > 5 && <span className="text-xs font-semibold text-amber-600 ml-1">+{referrals.length - 5}</span>}
+                </div>
+              )}
+            </div>
+            {referrals.length === 0 ? (
+              <p className="text-sm text-[#6B7280]">Henüz referans getirdiği bir kişi yok.</p>
+            ) : (
+              <div className="space-y-2">
+                {referrals.map((r) => {
+                  const route = r.lifecycle_status === "lead" ? `/leads/${r.id}` : `/customers/${r.id}`;
+                  const badge = r.lifecycle_status === "customer" ? "bg-emerald-100 text-emerald-800" : r.lifecycle_status === "graduate" ? "bg-purple-100 text-purple-800" : "bg-amber-100 text-amber-800";
+                  const badgeLabel = r.lifecycle_status === "customer" ? "Aktif" : r.lifecycle_status === "graduate" ? "Mezun" : "Potansiyel";
+                  return (
+                    <Link key={r.id} to={route} className="flex justify-between items-center p-3 border border-[#F3F4F6] rounded-lg hover:border-[#065F46] hover:bg-[#F9FAFB]">
+                      <div>
+                        <div className="text-sm font-semibold text-[#111827]">{r.name}</div>
+                        <div className="text-xs text-[#6B7280]">{r.phone || "-"} · {formatDateTR(r.customer_since || r.request_date)}</div>
+                      </div>
+                      <span className={`badge-soft ${badge}`}>{badgeLabel}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            )}
+          </div>
         </div>
       )}
 

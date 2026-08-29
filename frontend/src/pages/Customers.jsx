@@ -2,16 +2,19 @@ import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
 import { formatDateTR, useAuth, calcAge } from "../lib/auth";
+import { Star } from "lucide-react";
 
 export default function Customers({ lifecycle = "customer", title = "Aktif Müşteriler" }) {
   const { isAdmin } = useAuth();
   const [persons, setPersons] = useState([]);
   const [users, setUsers] = useState([]);
   const [q, setQ] = useState("");
+  const [referralCounts, setReferralCounts] = useState({});
 
   useEffect(() => {
     api.get("/persons", { params: { lifecycle } }).then((r) => setPersons(r.data));
     api.get("/users").then((r) => setUsers(r.data));
+    api.get("/persons/referrals/counts").then((r) => setReferralCounts(r.data || {})).catch(() => setReferralCounts({}));
   }, [lifecycle]);
 
   const userName = (id) => users.find((u) => u.id === id)?.name || "-";
@@ -30,15 +33,30 @@ export default function Customers({ lifecycle = "customer", title = "Aktif Müş
         <table className="data-table">
           <thead><tr><th>Ad Soyad</th><th>Telefon</th><th>Yaş</th><th>Beslenme Koçu</th><th>Müşteri Olma Tarihi</th></tr></thead>
           <tbody>
-            {filtered.map((p) => (
+            {filtered.map((p) => {
+              const stars = referralCounts[p.id] || 0;
+              return (
               <tr key={p.id}>
-                <td><Link to={`/customers/${p.id}`} className="text-[#065F46] font-medium hover:underline" data-testid={`customer-row-${p.id}`}>{p.name}</Link></td>
+                <td>
+                  <Link to={`/customers/${p.id}`} className="text-[#065F46] font-medium hover:underline inline-flex items-center gap-1.5" data-testid={`customer-row-${p.id}`}>
+                    {p.name}
+                    {stars > 0 && (
+                      <span className="inline-flex items-center gap-0.5" title={`${stars} referans getirdi`} data-testid={`customer-stars-${p.id}`}>
+                        {Array.from({ length: Math.min(stars, 5) }).map((_, i) => (
+                          <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />
+                        ))}
+                        {stars > 5 && <span className="text-[10px] font-semibold text-amber-600">+{stars - 5}</span>}
+                      </span>
+                    )}
+                  </Link>
+                </td>
                 <td>{p.phone || p.instagram || "-"}</td>
                 <td className="text-sm">{calcAge(p.birth_date) != null ? calcAge(p.birth_date) : "-"}</td>
                 <td>{userName(p.assigned_to)}</td>
                 <td className="text-sm text-[#6B7280]">{formatDateTR(p.customer_since)}</td>
               </tr>
-            ))}
+              );
+            })}
             {filtered.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-[#6B7280]">Kayıt yok.</td></tr>}
           </tbody>
         </table>
