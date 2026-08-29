@@ -4,6 +4,7 @@ import { api, formatError } from "../lib/api";
 import { formatDateTR, formatDateTimeTR, formatTRY, todayISO, useAuth } from "../lib/auth";
 import { toast } from "sonner";
 import { ArrowLeft, Phone, Instagram, Plus, UserCheck, Archive } from "lucide-react";
+import ReferralPicker from "../components/ReferralPicker";
 
 export default function LeadDetail() {
   const { id } = useParams();
@@ -12,6 +13,7 @@ export default function LeadDetail() {
   const [p, setP] = useState(null);
   const [refs, setRefs] = useState({ stages: [], sources: [], categories: [], negatives: [], users: [] });
   const [contacts, setContacts] = useState([]);
+  const [referrerName, setReferrerName] = useState("");
   const [showContact, setShowContact] = useState(false);
   const [showConvert, setShowConvert] = useState(false);
 
@@ -19,6 +21,14 @@ export default function LeadDetail() {
     const { data } = await api.get(`/persons/${id}`);
     setP(data);
     setContacts((await api.get(`/contacts?person_id=${id}`)).data);
+    if (data.referred_by_person_id) {
+      try {
+        const { data: ref } = await api.get(`/persons/${data.referred_by_person_id}`);
+        setReferrerName(ref.name);
+      } catch { setReferrerName(""); }
+    } else {
+      setReferrerName("");
+    }
   };
 
   useEffect(() => {
@@ -78,6 +88,27 @@ export default function LeadDetail() {
                 </select>
               </div>
               <Row label="Talep Tarihi" v={formatDateTR(p.request_date)} />
+              {(() => {
+                const src = refs.sources.find((s) => s.id === p.source_id);
+                const isRef = src && src.name.toLowerCase().includes("referans");
+                if (!isRef) return null;
+                return (
+                  <div>
+                    <div className="text-[#6B7280] mb-1">Kimin Referansı</div>
+                    <ReferralPicker
+                      value={p.referred_by_person_id}
+                      valueName={referrerName}
+                      onChange={(refId) => update({ referred_by_person_id: refId })}
+                      testid="lead-referrer"
+                    />
+                    {p.referred_by_person_id && referrerName && (
+                      <Link to={`/customers/${p.referred_by_person_id}`} className="text-xs text-[#065F46] hover:underline block mt-1">
+                        Referans veren müşteriye git →
+                      </Link>
+                    )}
+                  </div>
+                );
+              })()}
               <div className="flex justify-between items-center gap-2">
                 <span className="text-[#6B7280]">Doğum Tarihi</span>
                 <input type="date" defaultValue={p.birth_date || ""} onBlur={(e) => e.target.value !== (p.birth_date || "") && update({ birth_date: e.target.value || null })} className="text-sm border border-[#E5E7EB] rounded px-2 py-1 max-w-[60%]" data-testid="lead-birth-input" />

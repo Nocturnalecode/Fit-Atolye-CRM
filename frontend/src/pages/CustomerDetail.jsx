@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, formatError } from "../lib/api";
 import { formatDateTR, formatTRY, todayISO, useAuth, calcAge } from "../lib/auth";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import ReferralPicker from "../components/ReferralPicker";
 
 const TABS = ["Genel Bakış", "İletişim", "Üyelikler", "Ödemeler", "Ölçümler", "Randevular", "Ürün Satışları", "Notlar"];
 
@@ -21,10 +22,12 @@ export default function CustomerDetail() {
   const [sales, setSales] = useState([]);
   const [products, setProducts] = useState([]);
   const [contacts, setContacts] = useState([]);
+  const [sources, setSources] = useState([]);
+  const [referrerName, setReferrerName] = useState("");
   const [modal, setModal] = useState(null);
 
   const load = async () => {
-    const [pr, f, m, py, me, ap, s, pr2, ct] = await Promise.all([
+    const [pr, f, m, py, me, ap, s, pr2, ct, src] = await Promise.all([
       api.get(`/persons/${id}`),
       api.get(`/persons/${id}/financial`).catch(() => ({ data: null })),
       api.get(`/memberships?person_id=${id}`),
@@ -34,10 +37,17 @@ export default function CustomerDetail() {
       api.get(`/product-sales?person_id=${id}`),
       api.get(`/products?active=true`),
       api.get(`/contacts?person_id=${id}`),
+      api.get(`/ref/sources`),
     ]);
     setP(pr.data); setFin(f.data); setMemberships(m.data); setPayments(py.data);
     setMeasurements(me.data); setAppointments(ap.data); setSales(s.data);
-    setProducts(pr2.data); setContacts(ct.data);
+    setProducts(pr2.data); setContacts(ct.data); setSources(src.data);
+    if (pr.data.referred_by_person_id) {
+      try {
+        const { data: refData } = await api.get(`/persons/${pr.data.referred_by_person_id}`);
+        setReferrerName(refData.name);
+      } catch { setReferrerName(""); }
+    } else { setReferrerName(""); }
   };
 
   useEffect(() => { load(); }, [id]); // eslint-disable-line
@@ -104,6 +114,33 @@ export default function CustomerDetail() {
                 data-testid="customer-birth-date"
               />
             </div>
+            {(() => {
+              const src = sources.find((s) => s.id === p.source_id);
+              const isRef = src && src.name.toLowerCase().includes("referans");
+              if (!isRef) return null;
+              return (
+                <div className="md:col-span-3">
+                  <div className="text-xs text-[#6B7280] mb-1">Kimin Referansı</div>
+                  <ReferralPicker
+                    value={p.referred_by_person_id}
+                    valueName={referrerName}
+                    onChange={async (refId) => {
+                      try {
+                        await api.patch(`/persons/${id}`, { referred_by_person_id: refId });
+                        toast.success("Referans güncellendi");
+                        load();
+                      } catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+                    }}
+                    testid="customer-referrer"
+                  />
+                  {p.referred_by_person_id && referrerName && (
+                    <Link to={`/customers/${p.referred_by_person_id}`} className="text-xs text-[#065F46] hover:underline block mt-1">
+                      Referans veren müşteriye git →
+                    </Link>
+                  )}
+                </div>
+              );
+            })()}
           </div>
           {financial && (
             <div className="mt-5 border-t pt-4">
