@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../lib/auth";
 import {
   LayoutDashboard, Users, UserCheck, GraduationCap, Calendar as CalIcon,
@@ -25,10 +25,11 @@ export default function Layout() {
     <div className="min-h-screen flex bg-[#F9FAFB]">
       {/* Sidebar */}
       <aside
-        className={`fixed lg:static z-40 top-0 left-0 h-full w-[240px] bg-white border-r border-[#E5E7EB] transform transition-transform ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
+        className={`fixed lg:sticky lg:top-0 z-40 h-screen w-[240px] bg-white border-r border-[#E5E7EB] transform transition-transform flex flex-col shrink-0 ${open ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
         data-testid="sidebar"
       >
-        <div className="p-5 flex items-center gap-2 border-b border-[#E5E7EB]">
+        {/* Logo */}
+        <div className="p-5 flex items-center gap-2 border-b border-[#E5E7EB] shrink-0">
           <div className="w-9 h-9 rounded-lg bg-[#065F46] flex items-center justify-center">
             <Flame className="w-5 h-5 text-white" />
           </div>
@@ -38,7 +39,8 @@ export default function Layout() {
           </div>
         </div>
 
-        <nav className="p-3 flex flex-col gap-1">
+        {/* Nav (scrolls if needed) */}
+        <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto min-h-0">
           {NAV.map((n) => (
             <NavLink
               key={n.to}
@@ -48,15 +50,16 @@ export default function Layout() {
               className={({ isActive }) => `sidebar-item ${isActive ? "active" : ""}`}
               onClick={() => setOpen(false)}
             >
-              <n.icon className="w-4 h-4" />
-              <span>{n.label}</span>
+              <n.icon className="w-4 h-4 shrink-0" />
+              <span className="truncate">{n.label}</span>
             </NavLink>
           ))}
         </nav>
 
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-[#E5E7EB] bg-white">
+        {/* Footer: profile + logout */}
+        <div className="p-4 border-t border-[#E5E7EB] bg-white shrink-0">
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-9 h-9 rounded-full bg-[#D1FAE5] flex items-center justify-center text-[#065F46] font-bold text-sm">
+            <div className="w-9 h-9 rounded-full bg-[#D1FAE5] flex items-center justify-center text-[#065F46] font-bold text-sm shrink-0">
               {user?.name?.[0]?.toUpperCase() || "?"}
             </div>
             <div className="flex-1 min-w-0">
@@ -86,7 +89,7 @@ export default function Layout() {
       </button>
 
       {/* Main */}
-      <main className="flex-1 min-w-0 lg:ml-0 pt-14 lg:pt-0">
+      <main className="flex-1 min-w-0 pt-14 lg:pt-0">
         <Outlet />
       </main>
     </div>

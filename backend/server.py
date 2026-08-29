@@ -431,6 +431,7 @@ def _filter_for_user(current: dict) -> dict:
 async def list_persons(
     lifecycle: Optional[str] = None,
     assigned_to: Optional[str] = None,
+    unassigned: Optional[bool] = None,
     source_id: Optional[str] = None,
     stage_id: Optional[str] = None,
     priority: Optional[str] = None,
@@ -446,7 +447,9 @@ async def list_persons(
     filt: dict = _filter_for_user(current)
     if lifecycle:
         filt["lifecycle_status"] = lifecycle
-    if assigned_to:
+    if unassigned:
+        filt["assigned_to"] = None
+    elif assigned_to:
         filt["assigned_to"] = assigned_to
     if source_id:
         filt["source_id"] = source_id
