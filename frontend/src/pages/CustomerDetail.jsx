@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, formatError } from "../lib/api";
 import { formatDateTR, formatTRY, todayISO, useAuth, calcAge } from "../lib/auth";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Trash2, Users as UsersIcon, Star } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Users as UsersIcon, Star, Ticket, CheckCircle2, RotateCcw } from "lucide-react";
 import ReferralPicker from "../components/ReferralPicker";
 import { ReferralBadge } from "../components/ReferralBadge";
 
@@ -26,6 +26,7 @@ export default function CustomerDetail() {
   const [sources, setSources] = useState([]);
   const [referrerName, setReferrerName] = useState("");
   const [referrals, setReferrals] = useState([]);
+  const [coupons, setCoupons] = useState([]);
   const [modal, setModal] = useState(null);
 
   const load = async () => {
@@ -44,17 +45,40 @@ export default function CustomerDetail() {
     setP(pr.data); setFin(f.data); setMemberships(m.data); setPayments(py.data);
     setMeasurements(me.data); setAppointments(ap.data); setSales(s.data);
     setProducts(pr2.data); setContacts(ct.data); setSources(src.data);
-    // load who this person referred
+    // load who this person referred + their coupons
     try {
       const { data: refs } = await api.get(`/persons/${id}/referrals`);
       setReferrals(refs);
     } catch { setReferrals([]); }
+    try {
+      const { data: cps } = await api.get(`/persons/${id}/coupons`);
+      setCoupons(cps);
+    } catch { setCoupons([]); }
     if (pr.data.referred_by_person_id) {
       try {
         const { data: refData } = await api.get(`/persons/${pr.data.referred_by_person_id}`);
         setReferrerName(refData.name);
       } catch { setReferrerName(""); }
     } else { setReferrerName(""); }
+  };
+
+  const toggleCoupon = async (c) => {
+    const newStatus = c.status === "used" ? "unused" : "used";
+    const msg = newStatus === "used"
+      ? `Bu %${c.discount_pct} indirim kuponunu KULLANILDI olarak işaretlemek istediğinize emin misiniz?`
+      : `Bu kuponu tekrar KULLANILABİLİR yapmak istediğinize emin misiniz?`;
+    if (!window.confirm(msg)) return;
+    // Optimistic update — instant UI feedback
+    setCoupons((prev) => prev.map((x) => x.id === c.id ? { ...x, status: newStatus } : x));
+    try {
+      await api.patch(`/coupons/${c.id}`, { status: newStatus });
+      toast.success(newStatus === "used" ? "Kupon kullanıldı olarak işaretlendi" : "Kupon tekrar aktif");
+      load();
+    } catch (e) {
+      // Rollback on failure
+      setCoupons((prev) => prev.map((x) => x.id === c.id ? { ...x, status: c.status } : x));
+      toast.error(formatError(e.response?.data?.detail) || "Güncelleme başarısız");
+    }
   };
 
   useEffect(() => { load(); }, [id]); // eslint-disable-line
@@ -76,8 +100,8 @@ export default function CustomerDetail() {
           </h1>
           <div className="text-sm text-[#6B7280] mt-1">{p.phone || "-"} · {p.instagram || ""}</div>
         </div>
-        <span className={`badge-soft ${p.lifecycle_status === "customer" ? "bg-emerald-100 text-emerald-800" : "bg-purple-100 text-purple-800"}`}>
-          {p.lifecycle_status === "customer" ? "Aktif Müşteri" : "Mezun"}
+        <span className={`badge-soft ${p.lifecycle_status === "customer" ? "bg-emerald-100 text-emerald-800" : p.lifecycle_status === "graduate" ? "bg-purple-100 text-purple-800" : "bg-amber-100 text-amber-800"}`}>
+          {p.lifecycle_status === "customer" ? "Aktif Müşteri" : p.lifecycle_status === "graduate" ? "Mezun" : "Potansiyel"}
         </span>
       </div>
 
@@ -204,6 +228,63 @@ export default function CustomerDetail() {
               </div>
             )}
           </div>
+
+          {coupons.length > 0 && (() => {
+            const unused = coupons.filter((c) => c.status === "unused");
+            const totalPct = unused.reduce((a, c) => a + (c.discount_pct || 0), 0);
+            return (
+              <div className="bg-white border border-[#E5E7EB] rounded-xl p-5" data-testid="referral-coupons">
+                <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+                  <div className="flex items-center gap-2">
+                    <Ticket className="w-4 h-4 text-[#065F46]" />
+                    <h4 className="font-bold" style={{fontFamily:'Manrope'}}>Referans İndirim Kuponları</h4>
+                  </div>
+                  {unused.length > 0 && (
+                    <span className="badge-soft bg-emerald-100 text-emerald-800 font-bold">
+                      Kullanılabilir toplam: %{totalPct} ({unused.length} kupon)
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-[#6B7280] mb-3">
+                  Her referans için 1 aylık ücretten %{coupons[0]?.discount_pct || 15} indirim kuponu. Her kupon bağımsız kullanılır.
+                </p>
+                <div className="space-y-2">
+                  {coupons.map((c) => {
+                    const isUsed = c.status === "used";
+                    return (
+                      <div key={c.id} className={`flex justify-between items-center p-3 border rounded-lg ${isUsed ? "border-[#F3F4F6] bg-[#F9FAFB] opacity-70" : "border-emerald-200 bg-emerald-50/40"}`}>
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-[#111827] flex items-center gap-2 flex-wrap">
+                            %{c.discount_pct} indirim
+                            <span className="text-xs text-[#6B7280] font-normal">
+                              · {c.referred_person_name || "referans"} getirdiği için
+                            </span>
+                          </div>
+                          <div className="text-xs text-[#6B7280] mt-0.5">
+                            {isUsed
+                              ? `Kullanıldı: ${formatDateTR(c.used_at?.slice(0, 10))}${c.used_by_name ? ` · ${c.used_by_name}` : ""}`
+                              : `Oluşturuldu: ${formatDateTR(c.created_at?.slice(0, 10))}`}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0">
+                          <span className={`badge-soft ${isUsed ? "bg-gray-200 text-gray-700" : "bg-emerald-100 text-emerald-800"}`}>
+                            {isUsed ? "Kullanıldı" : "Kullanılabilir"}
+                          </span>
+                          <button
+                            onClick={() => toggleCoupon(c)}
+                            className={`text-xs font-semibold px-3 py-1.5 rounded-lg inline-flex items-center gap-1 transition ${isUsed ? "bg-white border border-[#E5E7EB] text-[#065F46] hover:bg-[#F9FAFB]" : "bg-[#065F46] text-white hover:bg-[#064e3b]"}`}
+                            data-testid={`coupon-toggle-${c.id}`}
+                          >
+                            {isUsed ? (<><RotateCcw className="w-3 h-3" /> Geri al</>) : (<><CheckCircle2 className="w-3 h-3" /> Kullanıldı</>)}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            );
+          })()}
         </div>
       )}
 

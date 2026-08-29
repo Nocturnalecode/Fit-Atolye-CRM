@@ -41,12 +41,13 @@ class TestReferenceData:
 
 
 class TestProducts:
-    def test_products_seeded(self, admin):
+    def test_products_list(self, admin):
+        """Demo products were purged by design; assert endpoint shape only."""
         r = admin.get(f"{API}/products")
         assert r.status_code == 200
         items = r.json()
-        assert len(items) >= 5
-        assert all("price" in p for p in items)
+        assert isinstance(items, list)
+        assert all("price" in p and "_id" not in p for p in items)
 
     def test_admin_create_and_patch_product(self, admin, cleanup_misc):
         r = admin.post(f"{API}/products", json={"name": "TEST_Ürün", "price": 100.0, "active": True})

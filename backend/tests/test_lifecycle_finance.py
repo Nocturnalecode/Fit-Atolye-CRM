@@ -159,17 +159,17 @@ class TestPaymentsMeasurementsSales:
         assert upd.json()["weight"] == 84.0
         assert admin.delete(f"{API}/measurements/{m['id']}").status_code == 200
 
-    def test_product_sale_rejected_for_lead(self, admin, cleanup_persons):
+    def test_product_sale_rejected_for_lead(self, admin, cleanup_persons, a_product):
         lead = _make_lead(admin, cleanup_persons, "TEST_SaleLead")
-        prod = admin.get(f"{API}/products").json()[0]
+        prod = a_product
         r = admin.post(f"{API}/product-sales", json={"person_id": lead["id"], "product_id": prod["id"],
                                                      "qty": 1, "unit_price": prod["price"],
                                                      "sale_date": d(0), "method": "Nakit"})
         assert r.status_code == 400, f"expected 400 for lead sale, got {r.status_code}"
 
-    def test_product_sale_for_customer_and_scoping(self, admin, consultant, customer):
+    def test_product_sale_for_customer_and_scoping(self, admin, consultant, customer, a_product):
         pid = customer["person"]["id"]
-        prod = admin.get(f"{API}/products").json()[0]
+        prod = a_product
         r = consultant.post(f"{API}/product-sales", json={"person_id": pid, "product_id": prod["id"],
                                                           "qty": 2, "unit_price": 300.0,
                                                           "sale_date": d(0), "method": "Nakit"})
@@ -180,12 +180,12 @@ class TestPaymentsMeasurementsSales:
         listed = admin.get(f"{API}/product-sales", params={"person_id": pid}).json()
         assert any(s["id"] == sale["id"] and s["qty"] == 2 for s in listed)
 
-    def test_consultant_cannot_sell_to_other_consultants_customer(self, admin, consultant, consultant_login):
+    def test_consultant_cannot_sell_to_other_consultants_customer(self, admin, consultant, consultant_login, a_product):
         cust = [p for p in admin.get(f"{API}/persons", params={"lifecycle": "customer"}).json()
                 if p.get("assigned_to") != consultant_login["user"]["id"]]
         if not cust:
             pytest.skip("no customer assigned to another consultant")
-        prod = admin.get(f"{API}/products").json()[0]
+        prod = a_product
         r = consultant.post(f"{API}/product-sales", json={"person_id": cust[0]["id"], "product_id": prod["id"],
                                                           "qty": 1, "unit_price": 100.0,
                                                           "sale_date": d(0), "method": "Nakit"})

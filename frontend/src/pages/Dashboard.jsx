@@ -95,7 +95,7 @@ export default function Dashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">
-          <h3 className="font-bold text-[#111827] mb-4" style={{fontFamily:'Manrope'}}>Kaynaklara Göre Dağılım</h3>
+          <h3 className="font-bold text-[#111827] mb-4" style={{fontFamily:'Manrope'}}>Edinme Yöntemine Göre Dağılım</h3>
           <ResponsiveContainer width="100%" height={240}>
             <PieChart>
               <Pie data={data.by_source} dataKey="value" nameKey="name" innerRadius={50} outerRadius={90} paddingAngle={2}>
@@ -123,7 +123,7 @@ export default function Dashboard() {
           <div className="bg-white border border-[#E5E7EB] rounded-xl p-5 lg:col-span-2">
             <h3 className="font-bold text-[#111827] mb-4" style={{fontFamily:'Manrope'}}>Beslenme Koçu Satış İstatistikleri</h3>
             <table className="data-table">
-              <thead><tr><th>Beslenme Koçu</th><th>Randevu</th><th>Kayıt</th><th>Dönüşüm</th></tr></thead>
+              <thead><tr><th>Beslenme Koçu</th><th>Randevu</th><th>Kayıt</th><th>Başarı</th></tr></thead>
               <tbody>
                 {data.conversion_by_consultant.map((c) => (
                   <tr key={c.name}>

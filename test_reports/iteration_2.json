@@ -1,0 +1,80 @@
+{
+  "summary": "Focused retest of (a) Reports Excel/PDF exports and (b) the new Referral Reward Coupon system, plus full backend regression (102 tests) and Playwright UI verification. New suite /app/backend/tests/test_coupons_exports.py (13 tests) — ALL PASS: excel/pdf export magic bytes + content-type + user_id filter + 400 on bad format + 401 unauth; auto-coupon on referral (15%, unused, referred_person_name correct, no _id leak); 2 referrals => 2 independent coupons (%30 total); PATCH used/unused sets & clears used_at/used_by/used_by_name and persists; coupon A used does NOT affect coupon B; delete cascade keeps USED coupons and removes UNUSED ones (both for referred person and referrer); startup backfill creates missing coupons (verified with backend restart, now env-gated); RBAC 403 for consultant on non-assigned person for both GET /persons/{pid}/coupons and PATCH /coupons/{cid}, 200 for admin/assigned consultant; 404 for unknown person/coupon. UI: admin login -> /customers/8cee312f... renders data-testid='referral-coupons' with summary badge '%15 (1 kupon)' / '%30 (2 kupon)', per-coupon rows, confirm dialog on toggle, used state persists after reload, cancel keeps state, toggle-back works. Reports page Excel & PDF buttons download valid xlsx (PK, 4983 B) and pdf (%PDF-), also with consultant filter. Full regression: 99 passed, 3 failed, 2 skipped — the 3 failures are pre-existing auth/RBAC hardening gaps unrelated to this iteration. DB left tidy (1 baseline seed coupon, 0 TEST_ persons/products, login_attempts cleared).",
+  "backend_issues": {
+    "critical": [],
+    "minor": [
+      {
+        "endpoint": "POST /api/auth/login",
+        "issue": "Brute-force lockout is unreliable: login_attempts identifier = f'{request.client.host}:{email}'. Behind the k8s ingress requests arrive from several proxy IPs (observed 10.231.129.137 and .138), so 6 consecutive bad logins split across identifiers and never reach the 5-fail threshold (codes=[401 x6]). Key the counter on email only (optionally combined with X-Forwarded-For first hop)."
+      },
+      {
+        "endpoint": "POST /api/auth/login",
+        "issue": "No httpOnly access_token cookie is set although auth.py falls back to an access_token cookie; token is returned in the JSON body only (frontend stores it client-side). Pre-existing from iteration 1."
+      },
+      {
+        "endpoint": "GET /api/users",
+        "issue": "Consultant can list all users (200) — user directory is not admin-only. Pre-existing from iteration 1; confirm if intentional (assignment dropdowns) and if so restrict the returned fields."
+      }
+    ]
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "CustomerDetail header status badge",
+        "issue": "Badge is binary: lifecycle_status==='customer' ? 'Aktif Müşteri' : 'Mezun'. A lead (e.g. referrer 8cee312f..., Durum: lead) is mislabeled 'Mezun' in the header while the overview shows 'lead'. Should map lead/customer/graduate distinctly.",
+        "selector": "CustomerDetail.jsx line ~99 span.badge-soft",
+        "priority": "MEDIUM"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Coupon toggle refresh latency",
+        "issue": "toggleCoupon() PATCHes then calls the full load() (12 parallel/sequential API calls) with no optimistic update or pending state; the card can still show the old status for ~2s after the success toast appears (my first 3s assertion caught a stale card while the backend was already 'used'). Consider optimistic setCoupons update or a per-row spinner + disabled button.",
+        "affected_selectors": ["[data-testid='referral-coupons']", "[data-testid^='coupon-toggle-']"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "CustomerDetail — Genel Bakış",
+        "issues": [
+          "'Doğum Tarihi' uses the native browser date input (mm/dd/yyyy US format) instead of the shadcn calendar / TR dd.MM.yyyy format used elsewhere.",
+          "Coupon card itself is well laid out (green=unused / gray=used, contrast OK); no contrast or spacing problems found on Reports page."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [
+    "/app/backend/tests/test_coupons_exports.py",
+    "/app/backend/tests/conftest.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Fix brute-force lockout key (use email, not request.client.host, behind ingress).",
+    "Decide/fix httpOnly cookie on login (auth.py already reads access_token cookie).",
+    "Restrict GET /api/users to admin (or return minimal fields to consultants).",
+    "Fix CustomerDetail header badge so leads are not labelled 'Mezun'.",
+    "Optional: optimistic update / disabled state for coupon toggle to avoid ~2s stale card."
+  ],
+  "critical_code_review_comments": [
+    "/app/backend/server.py is 1635 lines — split into routers (persons, coupons, finance, reports) as suggested previously; a routes/ package already exists but is unused.",
+    "Startup backfill iterates all persons with referred_by_person_id on every boot and issues 1 find_one per person; fine now (2 persons) but should be an aggregation/bulk op if data grows.",
+    "_create_referral_coupon correctly de-duplicates on (person_id, referred_person_id); consider a unique compound index to enforce it under concurrency.",
+    "CORS: allow_origins comes from CORS_ORIGINS which is '*' in backend/.env, so allow_credentials is force-disabled — acceptable for Bearer-token auth, but blocks any future cookie auth; set an explicit origin list if httpOnly cookies are adopted."
+  ],
+  "updated_files": [
+    "/app/backend/tests/test_coupons_exports.py (new)",
+    "/app/backend/tests/conftest.py (added cleanup_coupons + a_product fixtures)",
+    "/app/backend/tests/test_auth.py (lockout test now uses a throwaway email + cleanup so it no longer locks the seeded consultant for 15 min and cascade-fails 15 other tests; added RCA message)",
+    "/app/backend/tests/test_persons.py (removed stale demo-data count assertions; search test creates its own person)",
+    "/app/backend/tests/test_dashboard_reports.py (demo-data-independent assertions; conversion_by_consultant now returns 'appointments' not 'total'; KPI consultant scoping asserted as upper bound)",
+    "/app/backend/tests/test_reference_settings.py (products no longer assumed seeded)",
+    "/app/backend/tests/test_lifecycle_finance.py (product-sale tests use new a_product fixture)"
+  ],
+  "success_rate": {"backend": "97% (99/102, 3 pre-existing hardening failures)", "frontend": "100% of coupon + export flows verified"},
+  "seed_data_creation": "Only temporary TEST_ persons/products/coupons via API, all deleted afterwards. One temporary UI referral (TEST_UI_Referral2) created and deleted. Existing seed data untouched: referrer 8cee312f... still has exactly 1 unused %15 coupon; login_attempts collection cleared. No demo data recreated.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "test_credentials": "Admin armaganesralife@gmail.com / Admin123!; consultant ayse@fitatolye.com / Danisman123! (both valid, from /app/memory/test_credentials.md)",
+  "context_for_next_testing_agent": "Run `pytest /app/backend/tests/ -q` (102 tests). Expected known failures: test_login_sets_httponly_cookie, test_bruteforce_lockout (IP-keyed identifier behind ingress), test_consultant_cannot_list_users. test_backfill_creates_missing_coupons restarts the backend and is skipped unless RUN_RESTART_TESTS=1 — run it standalone (it PASSES). Never run the lockout test against real seeded accounts; it now uses test_lockout_probe@fitatolye.com and cleans login_attempts. Demo data was intentionally purged by the user: do NOT reintroduce count-based assertions on seeded persons/products.",
+  "rca_of_the_issue": "Iteration-2 features (coupons + exports) work end-to-end; no defect found in them. Earlier 18-test cascade failure was self-inflicted by the existing lockout test locking the seeded consultant for 15 minutes plus my backfill test restarting the backend mid parallel run — both fixed in test code. Remaining brute-force failure is a genuine backend issue: lockout identifier includes request.client.host, which varies across ingress proxy pods, so counters never accumulate to 5."
+}

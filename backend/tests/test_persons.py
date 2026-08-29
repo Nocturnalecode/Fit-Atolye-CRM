@@ -3,19 +3,23 @@ from conftest import API, d, uniq_phone
 
 
 class TestPersonsListing:
-    def test_admin_sees_seeded_leads(self, admin):
+    def test_admin_sees_leads(self, admin):
+        """Demo data was intentionally purged; assert shape + filter correctness only."""
         r = admin.get(f"{API}/persons", params={"lifecycle": "lead"})
         assert r.status_code == 200, r.text
         leads = r.json()
-        assert len(leads) >= 9, f"expected >=9 demo leads, got {len(leads)}"
+        assert isinstance(leads, list)
         assert all(p["lifecycle_status"] == "lead" for p in leads)
         assert all("_id" not in p for p in leads)
 
-    def test_admin_sees_customers_and_graduates(self, admin):
-        cust = admin.get(f"{API}/persons", params={"lifecycle": "customer"}).json()
-        grad = admin.get(f"{API}/persons", params={"lifecycle": "graduate"}).json()
-        assert len(cust) >= 2
-        assert len(grad) >= 1
+    def test_admin_lifecycle_filters(self, admin):
+        for lc in ("customer", "graduate"):
+            r = admin.get(f"{API}/persons", params={"lifecycle": lc})
+            assert r.status_code == 200, r.text
+            items = r.json()
+            assert isinstance(items, list)
+            assert all(p["lifecycle_status"] == lc for p in items)
+            assert all("_id" not in p for p in items)
 
     def test_consultant_scoped_to_own_leads(self, consultant, consultant_login):
         r = consultant.get(f"{API}/persons", params={"lifecycle": "lead"})
@@ -24,10 +28,16 @@ class TestPersonsListing:
         assert all(p["assigned_to"] == consultant_login["user"]["id"] for p in leads), \
             "consultant sees leads not assigned to them"
 
-    def test_search_filter(self, admin):
-        r = admin.get(f"{API}/persons", params={"q": "Ahmet"})
-        assert r.status_code == 200
-        assert any("Ahmet" in p["name"] for p in r.json())
+    def test_search_filter(self, admin, cleanup_persons):
+        """Create a person then search it by name (no reliance on purged demo data)."""
+        sid = admin.get(f"{API}/ref/sources").json()[0]["id"]
+        r = admin.post(f"{API}/persons", json={"name": "TEST_AhmetSearch", "phone": uniq_phone(),
+                                               "source_id": sid, "request_date": d(0), "force": True})
+        assert r.status_code == 200, r.text
+        cleanup_persons.append(r.json()["id"])
+        s = admin.get(f"{API}/persons", params={"q": "AhmetSearch"})
+        assert s.status_code == 200
+        assert any("TEST_AhmetSearch" == p["name"] for p in s.json())
 
     def test_get_person_404(self, admin):
         assert admin.get(f"{API}/persons/nope-000").status_code == 404

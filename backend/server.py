@@ -612,6 +612,86 @@ async def get_person(pid: str, current=Depends(current_user_dep)):
     return p
 
 
+# --- Referral Coupons ---
+REFERRAL_DISCOUNT_PCT = 15
+
+
+async def _create_referral_coupon(referrer_id: str, referred_person_id: str) -> None:
+    """Create a %15 coupon for the referrer when a new referral is added.
+    Prevents duplicate coupons for the same (referrer, referred_person) pair.
+    """
+    if not referrer_id or not referred_person_id:
+        return
+    existing = await db.coupons.find_one({
+        "person_id": referrer_id,
+        "referred_person_id": referred_person_id,
+    })
+    if existing:
+        return
+    referred = await db.persons.find_one({"id": referred_person_id}, {"_id": 0, "name": 1})
+    coupon = {
+        "id": new_id(),
+        "person_id": referrer_id,
+        "referred_person_id": referred_person_id,
+        "referred_person_name": (referred or {}).get("name", ""),
+        "discount_pct": REFERRAL_DISCOUNT_PCT,
+        "status": "unused",
+        "used_at": None,
+        "used_by": None,
+        "used_by_name": None,
+        "note": "",
+        "created_at": now_iso(),
+    }
+    await db.coupons.insert_one(coupon)
+
+
+@api.get("/persons/{pid}/coupons")
+async def person_coupons(pid: str, current=Depends(current_user_dep)):
+    """List all discount coupons owned by this person (as referrer)."""
+    p = await db.persons.find_one({"id": pid})
+    if not p:
+        raise HTTPException(404, "Kayıt bulunamadı")
+    if current.get("role") != "admin" and p.get("assigned_to") != current["id"]:
+        raise HTTPException(403, "Yetki yok")
+    coupons = await db.coupons.find({"person_id": pid}, {"_id": 0}).sort("created_at", -1).to_list(500)
+    return coupons
+
+
+class CouponUpdate(BaseModel):
+    status: Optional[str] = None  # "used" | "unused"
+    note: Optional[str] = None
+
+
+@api.patch("/coupons/{cid}")
+async def update_coupon(cid: str, body: CouponUpdate, current=Depends(current_user_dep)):
+    c = await db.coupons.find_one({"id": cid})
+    if not c:
+        raise HTTPException(404, "Kupon bulunamadı")
+    # Access control: admin OR coach assigned to the coupon owner
+    if current.get("role") != "admin":
+        owner = await db.persons.find_one({"id": c["person_id"]}, {"_id": 0, "assigned_to": 1})
+        if not owner or owner.get("assigned_to") != current["id"]:
+            raise HTTPException(403, "Yetki yok")
+    upd: dict = {}
+    if body.status is not None:
+        if body.status not in ("used", "unused"):
+            raise HTTPException(400, "Geçersiz durum")
+        upd["status"] = body.status
+        if body.status == "used":
+            upd["used_at"] = now_iso()
+            upd["used_by"] = current["id"]
+            upd["used_by_name"] = current["name"]
+        else:
+            upd["used_at"] = None
+            upd["used_by"] = None
+            upd["used_by_name"] = None
+    if body.note is not None:
+        upd["note"] = body.note
+    if upd:
+        await db.coupons.update_one({"id": cid}, {"$set": upd})
+    return await db.coupons.find_one({"id": cid}, {"_id": 0})
+
+
 @api.delete("/persons/{pid}")
 async def delete_person(pid: str, current=Depends(current_user_dep)):
     require_admin(current)
@@ -626,6 +706,9 @@ async def delete_person(pid: str, current=Depends(current_user_dep)):
     await db.contacts.delete_many({"person_id": pid})
     await db.product_sales.delete_many({"person_id": pid})
     await db.tasks.delete_many({"person_id": pid})
+    # Delete only UNUSED coupons; keep USED ones as historical record
+    await db.coupons.delete_many({"person_id": pid, "status": "unused"})
+    await db.coupons.delete_many({"referred_person_id": pid, "status": "unused"})
     # Clear referrals pointing to this person
     await db.persons.update_many({"referred_by_person_id": pid}, {"$set": {"referred_by_person_id": None}})
     await db.persons.delete_one({"id": pid})
@@ -668,6 +751,9 @@ async def create_person(body: PersonCreate, current=Depends(current_user_dep)):
         "created_at": now_iso(),
     }
     await db.persons.insert_one(p)
+    # Auto-create referral coupon for the referrer
+    if body.referred_by_person_id:
+        await _create_referral_coupon(body.referred_by_person_id, p["id"])
     p.pop("_id", None)
     return p
 
@@ -693,6 +779,16 @@ async def update_person(pid: str, body: PersonUpdate, current=Depends(current_us
             if not u or not u.get("active"):
                 upd["assigned_to"] = None
     await db.persons.update_one({"id": pid}, {"$set": upd})
+    # If referrer changed, sync unused coupons: delete stale unused, create new if applicable
+    if "referred_by_person_id" in upd:
+        old_ref = p.get("referred_by_person_id")
+        new_ref = upd["referred_by_person_id"]
+        if old_ref and old_ref != new_ref:
+            await db.coupons.delete_many({
+                "person_id": old_ref, "referred_person_id": pid, "status": "unused",
+            })
+        if new_ref and new_ref != old_ref:
+            await _create_referral_coupon(new_ref, pid)
     return await db.persons.find_one({"id": pid}, {"_id": 0})
 
 
@@ -1522,9 +1618,14 @@ async def startup():
     await db.users.create_index("email", unique=True)
     await db.persons.create_index([("phone", 1)])
     await db.persons.create_index([("instagram", 1)])
+    await db.coupons.create_index([("person_id", 1)])
+    await db.coupons.create_index([("referred_person_id", 1)])
     # Seed
     from seed import seed_all
     await seed_all(db)
+    # Backfill referral coupons for existing referral pairs that lack one
+    async for person in db.persons.find({"referred_by_person_id": {"$ne": None}}, {"_id": 0, "id": 1, "referred_by_person_id": 1}):
+        await _create_referral_coupon(person["referred_by_person_id"], person["id"])
     logger.info("FitAtölye CRM started.")
 
 

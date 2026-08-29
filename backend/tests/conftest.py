@@ -110,6 +110,32 @@ def cleanup_misc():
 
 
 @pytest.fixture(scope="class")
+def a_product(admin, cleanup_misc):
+    """Return an existing product, or create a TEST_ one (demo products were purged)."""
+    items = admin.get(f"{API}/products", timeout=30).json()
+    if items:
+        return items[0]
+    r = admin.post(f"{API}/products", json={"name": "TEST_SaleProduct", "price": 250.0, "active": True}, timeout=30)
+    assert r.status_code == 200, r.text
+    return r.json()
+
+
+@pytest.fixture(scope="class")
+def cleanup_coupons():
+    """Remove coupons (incl. USED ones kept by cascade rules) for tracked referrer ids."""
+    ids = []
+    yield ids
+    if not ids:
+        return
+    try:
+        cli, dbx = _mongo()
+        dbx.coupons.delete_many({"person_id": {"$in": ids}})
+        cli.close()
+    except Exception as exc:  # pragma: no cover
+        print(f"coupon cleanup skipped: {exc}")
+
+
+@pytest.fixture(scope="class")
 def cleanup_persons():
     """Remove TEST_ prefixed persons and their child records after class."""
     ids = []
