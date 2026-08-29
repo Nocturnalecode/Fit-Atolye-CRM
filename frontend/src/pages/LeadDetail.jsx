@@ -70,7 +70,7 @@ export default function LeadDetail() {
               <SelectRow label="Aşama" value={p.sales_stage_id} onChange={(v) => update({ sales_stage_id: v })} options={refs.stages} testid="stage-select" />
               <SelectRow label="Cevap Kategorisi" value={p.response_category_id} onChange={(v) => update({ response_category_id: v })} options={refs.categories} allowEmpty />
               <SelectRow label="Kaynak" value={p.source_id} onChange={(v) => update({ source_id: v })} options={refs.sources} />
-              {isAdmin && <SelectRow label="Danışman" value={p.assigned_to || ""} onChange={(v) => update({ assigned_to: v })} options={refs.users.filter((u) => u.role === "consultant")} allowEmpty />}
+              {isAdmin && <SelectRow label="Beslenme Koçu" value={p.assigned_to || ""} onChange={(v) => update({ assigned_to: v })} options={refs.users.filter((u) => u.role === "consultant")} allowEmpty />}
               <SelectRow label="Olumsuzluk Nedeni" value={p.negative_reason_id} onChange={(v) => update({ negative_reason_id: v })} options={refs.negatives} allowEmpty />
               <div className="flex justify-between"><span className="text-[#6B7280]">Öncelik</span>
                 <select value={p.priority} onChange={(e) => update({ priority: e.target.value })} className="text-sm border border-[#E5E7EB] rounded px-2 py-1">

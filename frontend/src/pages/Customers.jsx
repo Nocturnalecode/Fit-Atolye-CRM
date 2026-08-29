@@ -28,7 +28,7 @@ export default function Customers({ lifecycle = "customer", title = "Aktif Müş
 
       <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-x-auto">
         <table className="data-table">
-          <thead><tr><th>Ad Soyad</th><th>Telefon</th><th>Yaş</th><th>Danışman</th><th>Müşteri Olma Tarihi</th></tr></thead>
+          <thead><tr><th>Ad Soyad</th><th>Telefon</th><th>Yaş</th><th>Beslenme Koçu</th><th>Müşteri Olma Tarihi</th></tr></thead>
           <tbody>
             {filtered.map((p) => (
               <tr key={p.id}>

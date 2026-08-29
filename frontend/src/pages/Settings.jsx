@@ -86,24 +86,39 @@ export default function Settings() {
                 <React.Fragment key={u.id}>
                 <tr>
                   <td>{u.name}</td><td>{u.email}</td>
-                  <td>{u.role === "admin" ? "Yönetici" : "Danışman"}</td>
+                  <td>{u.role === "admin" ? "Yönetici" : "Beslenme Koçu"}</td>
                   <td>
-                    <button
-                      className="text-xs underline text-red-600 hover:text-red-800"
-                      data-testid={`delete-user-${u.id}`}
-                      onClick={async () => {
-                        const me = JSON.parse(localStorage.getItem("fitatolye_user") || "{}");
-                        if (u.id === me.id) { toast.error("Kendi hesabınızı silemezsiniz"); return; }
-                        if (!window.confirm(`${u.name} kullanıcısı silinsin mi? Bu işlem geri alınamaz. Kullanıcının potansiyelleri ve görevleri atanmamış olarak kalır.`)) return;
-                        try {
-                          await api.delete(`/users/${u.id}`);
-                          toast.success("Kullanıcı silindi");
-                          api.get("/users").then((r) => setUsers(r.data));
-                        } catch (e) {
-                          toast.error(formatError(e.response?.data?.detail));
-                        }
-                      }}
-                    >Sil</button>
+                    <div className="flex gap-3 items-center">
+                      <button
+                        className="text-xs underline text-[#065F46] hover:text-[#047857]"
+                        data-testid={`reset-password-${u.id}`}
+                        onClick={async () => {
+                          const np = window.prompt(`${u.name} için yeni şifre belirleyin (en az 6 karakter):`);
+                          if (!np) return;
+                          if (np.length < 6) { toast.error("Şifre en az 6 karakter olmalı"); return; }
+                          try {
+                            await api.patch(`/users/${u.id}`, { password: np });
+                            toast.success(`${u.name} için şifre güncellendi`);
+                          } catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+                        }}
+                      >Şifre Sıfırla</button>
+                      <button
+                        className="text-xs underline text-red-600 hover:text-red-800"
+                        data-testid={`delete-user-${u.id}`}
+                        onClick={async () => {
+                          const me = JSON.parse(localStorage.getItem("fitatolye_user") || "{}");
+                          if (u.id === me.id) { toast.error("Kendi hesabınızı silemezsiniz"); return; }
+                          if (!window.confirm(`${u.name} kullanıcısı silinsin mi? Bu işlem geri alınamaz. Kullanıcının potansiyelleri ve görevleri atanmamış olarak kalır.`)) return;
+                          try {
+                            await api.delete(`/users/${u.id}`);
+                            toast.success("Kullanıcı silindi");
+                            api.get("/users").then((r) => setUsers(r.data));
+                          } catch (e) {
+                            toast.error(formatError(e.response?.data?.detail));
+                          }
+                        }}
+                      >Sil</button>
+                    </div>
                   </td>
                 </tr>
                 </React.Fragment>
@@ -182,7 +197,7 @@ function UserForm({ onClose, onSaved }) {
           <div><label className="text-xs font-semibold">Ad</label><input className="w-full border rounded-lg px-3 py-2 text-sm mt-1" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="user-name" /></div>
           <div><label className="text-xs font-semibold">E-posta</label><input className="w-full border rounded-lg px-3 py-2 text-sm mt-1" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} data-testid="user-email" /></div>
           <div><label className="text-xs font-semibold">Şifre</label><input type="password" className="w-full border rounded-lg px-3 py-2 text-sm mt-1" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} data-testid="user-password" /></div>
-          <div><label className="text-xs font-semibold">Rol</label><select className="w-full border rounded-lg px-3 py-2 text-sm mt-1" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}><option value="consultant">Danışman</option><option value="admin">Yönetici</option></select></div>
+          <div><label className="text-xs font-semibold">Rol</label><select className="w-full border rounded-lg px-3 py-2 text-sm mt-1" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}><option value="consultant">Beslenme Koçu</option><option value="admin">Yönetici</option></select></div>
         </div>
         <div className="flex justify-end gap-2 mt-5">
           <button className="btn-ghost" onClick={onClose}>İptal</button>

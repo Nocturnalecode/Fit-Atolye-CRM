@@ -12,6 +12,7 @@ import CustomerDetail from "./pages/CustomerDetail";
 import CalendarTasks from "./pages/CalendarTasks";
 import Reports from "./pages/Reports";
 import Products from "./pages/Products";
+import Coaches from "./pages/Coaches";
 import Settings from "./pages/Settings";
 
 function Protected({ children }) {
@@ -34,6 +35,7 @@ function App() {
             <Route path="customers" element={<Customers lifecycle="customer" title="Aktif Müşteriler" />} />
             <Route path="customers/:id" element={<CustomerDetail />} />
             <Route path="graduates" element={<Customers lifecycle="graduate" title="Mezunlar Arşivi" />} />
+            <Route path="coaches" element={<Coaches />} />
             <Route path="calendar" element={<CalendarTasks />} />
             <Route path="reports" element={<Reports />} />
             <Route path="products" element={<Products />} />

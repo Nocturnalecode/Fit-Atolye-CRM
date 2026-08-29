@@ -85,14 +85,14 @@ export default function Dashboard() {
 
         {isAdmin && (
           <div className="bg-white border border-[#E5E7EB] rounded-xl p-5 lg:col-span-2">
-            <h3 className="font-bold text-[#111827] mb-4" style={{fontFamily:'Manrope'}}>Danışman Bazlı Dönüşüm</h3>
+            <h3 className="font-bold text-[#111827] mb-4" style={{fontFamily:'Manrope'}}>Beslenme Koçu Satış İstatistikleri</h3>
             <table className="data-table">
-              <thead><tr><th>Danışman</th><th>Toplam</th><th>Dönüşen</th><th>Oran</th></tr></thead>
+              <thead><tr><th>Beslenme Koçu</th><th>Randevu</th><th>Kayıt</th><th>Dönüşüm</th></tr></thead>
               <tbody>
                 {data.conversion_by_consultant.map((c) => (
                   <tr key={c.name}>
                     <td className="font-medium">{c.name}</td>
-                    <td>{c.total}</td>
+                    <td>{c.appointments ?? c.total ?? 0}</td>
                     <td>{c.converted}</td>
                     <td><span className="badge-soft bg-emerald-100 text-emerald-800">%{c.rate}</span></td>
                   </tr>

@@ -68,6 +68,11 @@ class LoginBody(BaseModel):
     password: str
 
 
+class ChangePasswordBody(BaseModel):
+    current_password: str
+    new_password: str
+
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str
@@ -325,6 +330,17 @@ async def me(current=Depends(current_user_dep)):
     return current
 
 
+@api.post("/auth/change-password")
+async def change_password(body: ChangePasswordBody, current=Depends(current_user_dep)):
+    user = await db.users.find_one({"id": current["id"]})
+    if not user or not verify_password(body.current_password, user["password_hash"]):
+        raise HTTPException(status_code=401, detail="Mevcut şifre hatalı")
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=400, detail="Yeni şifre en az 6 karakter olmalı")
+    await db.users.update_one({"id": current["id"]}, {"$set": {"password_hash": hash_password(body.new_password)}})
+    return {"ok": True}
+
+
 # --- Users ---
 @api.get("/users")
 async def list_users(current=Depends(current_user_dep)):
@@ -558,7 +574,7 @@ async def update_person(pid: str, body: PersonUpdate, current=Depends(current_us
             raise HTTPException(403, "Yetki yok")
         # consultants cannot reassign
         if body.assigned_to and body.assigned_to != p.get("assigned_to"):
-            raise HTTPException(403, "Danışman atamayı değiştiremez")
+            raise HTTPException(403, "Beslenme koçu atamayı değiştiremez")
     upd = {k: v for k, v in body.model_dump().items() if v is not None}
     upd["updated_at"] = now_iso()
     upd["updated_by"] = current["name"]
@@ -1145,12 +1161,13 @@ async def dashboard(current=Depends(current_user_dep)):
             by_neg[n] = by_neg.get(n, 0) + 1
     # consultant conversion
     users = await db.users.find({"role": "consultant"}, {"_id": 0}).to_list(100)
+    today_iso_str = datetime.now(timezone.utc).date().isoformat()
     conv_by_user = []
     for u in users:
-        total = await db.persons.count_documents({"assigned_to": u["id"]})
+        appointments_count = await db.appointments.count_documents({"assigned_to": u["id"]})
         converted = await db.persons.count_documents({"assigned_to": u["id"], "lifecycle_status": {"$in": ["customer", "graduate"]}})
-        rate = round((converted / total * 100), 1) if total else 0
-        conv_by_user.append({"name": u["name"], "total": total, "converted": converted, "rate": rate})
+        rate = round((converted / appointments_count * 100), 1) if appointments_count else 0
+        conv_by_user.append({"name": u["name"], "appointments": appointments_count, "converted": converted, "rate": rate})
     # Birthdays today (match MM-DD of birth_date)
     today_md = datetime.now(timezone.utc).strftime("%m-%d")
     bd_filter = {"birth_date": {"$ne": None}}
@@ -1318,6 +1335,33 @@ async def delete_wa_template(tid: str, current=Depends(current_user_dep)):
     require_admin(current)
     await db.wa_templates.delete_one({"id": tid})
     return {"ok": True}
+
+
+# --- Coaches (admin: per-coach detailed stats) ---
+@api.get("/coaches/stats")
+async def coaches_stats(current=Depends(current_user_dep)):
+    require_admin(current)
+    users = await db.users.find({"role": "consultant"}, {"password_hash": 0, "_id": 0}).to_list(200)
+    today_str = datetime.now(timezone.utc).date().isoformat()
+    result = []
+    for u in users:
+        uid = u["id"]
+        leads = await db.persons.count_documents({"assigned_to": uid, "lifecycle_status": "lead"})
+        active_customers = await db.persons.count_documents({"assigned_to": uid, "lifecycle_status": "customer"})
+        graduates = await db.persons.count_documents({"assigned_to": uid, "lifecycle_status": "graduate"})
+        appointments = await db.appointments.count_documents({"assigned_to": uid})
+        contacts = await db.contacts.count_documents({"user_id": uid})
+        open_tasks = await db.tasks.count_documents({"assigned_to": uid, "done": False})
+        overdue_tasks = await db.tasks.count_documents({"assigned_to": uid, "done": False, "due_date": {"$lt": today_str}})
+        conv_rate = round((active_customers + graduates) / appointments * 100, 1) if appointments else 0
+        result.append({
+            "id": uid, "name": u["name"], "email": u["email"], "active": u.get("active", True),
+            "leads": leads, "active_customers": active_customers, "graduates": graduates,
+            "appointments": appointments, "contacts": contacts,
+            "open_tasks": open_tasks, "overdue_tasks": overdue_tasks,
+            "conversion_rate": conv_rate,
+        })
+    return result
 
 
 # --- Settings ---

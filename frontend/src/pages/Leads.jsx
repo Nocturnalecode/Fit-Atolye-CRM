@@ -101,7 +101,7 @@ export default function Leads() {
         </select>
         {isAdmin && (
           <select className="text-sm border border-[#E5E7EB] rounded-lg px-2 py-1.5" value={filters.assigned_to} onChange={(e) => setFilters({ ...filters, assigned_to: e.target.value })} data-testid="filter-consultant">
-            <option value="">Tüm danışmanlar</option>
+            <option value="">Tüm koçlar</option>
             {users.filter((u) => u.role === "consultant").map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}
           </select>
         )}
@@ -193,7 +193,7 @@ export default function Leads() {
               <tr>
                 {isAdmin && <th style={{width:30}}></th>}
                 <th>Ad Soyad</th><th>Telefon</th><th>Kaynak</th><th>Aşama</th>
-                <th>Danışman</th><th>Öncelik</th><th>Takip</th><th style={{width:60}}>WA</th>
+                <th>Beslenme Koçu</th><th>Öncelik</th><th>Takip</th><th style={{width:60}}>WA</th>
               </tr>
             </thead>
             <tbody>
@@ -294,7 +294,7 @@ function LeadForm({ onClose, onSaved, stages, sources, users, isAdmin, currentUs
               <Field label="Talep Tarihi *"><input type="date" className="input" value={f.request_date} onChange={(e) => setF({ ...f, request_date: e.target.value })} /></Field>
             </div>
             {isAdmin && (
-              <Field label="Sorumlu Danışman *"><select className="input" value={f.assigned_to} onChange={(e) => setF({ ...f, assigned_to: e.target.value })} data-testid="lead-assigned"><option value="">Seçiniz</option>{users.filter((u) => u.role === "consultant").map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Field>
+              <Field label="Sorumlu Beslenme Koçu *"><select className="input" value={f.assigned_to} onChange={(e) => setF({ ...f, assigned_to: e.target.value })} data-testid="lead-assigned"><option value="">Seçiniz</option>{users.filter((u) => u.role === "consultant").map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Field>
             )}
             <div className="grid grid-cols-2 gap-3">
               <Field label="Öncelik"><select className="input" value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })}><option value="low">Düşük</option><option value="normal">Normal</option><option value="high">Yüksek</option></select></Field>
