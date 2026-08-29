@@ -8,13 +8,20 @@ import MonthCalendar from "../components/MonthCalendar";
 export default function CalendarTasks() {
   const [tasks, setTasks] = useState([]);
   const [appts, setAppts] = useState([]);
+  const [persons, setPersons] = useState([]);
   const [filter, setFilter] = useState("all");
   const [aptView, setAptView] = useState("month"); // month | list
   const [showForm, setShowForm] = useState(false);
 
   const load = async () => {
-    const [t, a] = await Promise.all([api.get("/tasks"), api.get("/appointments")]);
+    const [t, a, pc, pg] = await Promise.all([
+      api.get("/tasks"),
+      api.get("/appointments"),
+      api.get("/persons", { params: { lifecycle: "customer" } }),
+      api.get("/persons", { params: { lifecycle: "graduate" } }),
+    ]);
     setTasks(t.data); setAppts(a.data);
+    setPersons([...pc.data, ...pg.data]);
   };
   useEffect(() => { load(); }, []);
 
@@ -52,7 +59,7 @@ export default function CalendarTasks() {
             </div>
           </div>
           {aptView === "month" ? (
-            <MonthCalendar appointments={appts} onChanged={load} />
+            <MonthCalendar appointments={appts} persons={persons} onChanged={load} />
           ) : (
             <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">
               {appts.length === 0 ? <div className="text-center py-8 text-sm text-[#6B7280]">Randevu yok.</div> : (

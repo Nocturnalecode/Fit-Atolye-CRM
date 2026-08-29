@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
+import { HoverCard, HoverCardTrigger, HoverCardContent } from "./ui/hover-card";
 import { api } from "../lib/api";
 import { toast } from "sonner";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, User, Clock, FileText } from "lucide-react";
 
 const DAYS = ["Pzt", "Sal", "Çar", "Per", "Cum", "Cmt", "Paz"];
 const MONTHS = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
@@ -24,10 +26,16 @@ function buildMonthGrid(year, month) {
   });
 }
 
-export default function MonthCalendar({ appointments, onChanged }) {
+export default function MonthCalendar({ appointments, persons = [], onChanged }) {
   const today = new Date();
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [pending, setPending] = useState(null); // {apt, newDate, newIso}
+
+  const personMap = useMemo(() => {
+    const m = {};
+    for (const p of persons) m[p.id] = p;
+    return m;
+  }, [persons]);
 
   const cells = useMemo(() => buildMonthGrid(cursor.getFullYear(), cursor.getMonth()), [cursor]);
 
@@ -100,22 +108,57 @@ export default function MonthCalendar({ appointments, onChanged }) {
                     <div className={`text-[11px] font-semibold self-end ${isToday(d) ? "text-white bg-[#065F46] rounded-full w-5 h-5 flex items-center justify-center" : isSameMonth(d) ? "text-[#111827]" : "text-[#9CA3AF]"}`}>
                       {d.getDate()}
                     </div>
-                    {items.slice(0, 3).map((a, idx) => (
+                    {items.slice(0, 3).map((a, idx) => {
+                      const person = personMap[a.person_id];
+                      const time = (a.date || "").includes("T") ? a.date.slice(11, 16) : "";
+                      const statusColor = a.status === "Geldi" ? "bg-emerald-100 text-emerald-800" : a.status === "Gelmedi" ? "bg-red-100 text-red-800" : a.status === "İptal edildi" ? "bg-gray-100 text-gray-600" : "bg-amber-100 text-amber-800";
+                      return (
                       <Draggable key={a.id} draggableId={a.id} index={idx}>
                         {(prov, snap) => (
-                          <div
-                            ref={prov.innerRef}
-                            {...prov.draggableProps}
-                            {...prov.dragHandleProps}
-                            className={`text-[10px] leading-tight px-1.5 py-1 rounded truncate cursor-grab ${snap.isDragging ? "shadow-lg" : ""} ${a.status === "Geldi" ? "bg-emerald-100 text-emerald-800" : a.status === "Gelmedi" ? "bg-red-100 text-red-800" : a.status === "İptal edildi" ? "bg-gray-100 text-gray-600" : "bg-amber-100 text-amber-800"}`}
-                            title={`${a.type} - ${a.status}`}
-                            data-testid={`apt-chip-${a.id}`}
-                          >
-                            {(a.date || "").includes("T") ? a.date.slice(11, 16) : ""} {a.type}
-                          </div>
+                          <HoverCard openDelay={120} closeDelay={80}>
+                            <HoverCardTrigger asChild>
+                              <div
+                                ref={prov.innerRef}
+                                {...prov.draggableProps}
+                                {...prov.dragHandleProps}
+                                className={`text-[10px] leading-tight px-1.5 py-1 rounded truncate cursor-grab ${snap.isDragging ? "shadow-lg" : ""} ${statusColor}`}
+                                data-testid={`apt-chip-${a.id}`}
+                              >
+                                {time} {a.type}
+                              </div>
+                            </HoverCardTrigger>
+                            <HoverCardContent side="top" align="start" className="w-72 p-3" data-testid={`apt-hover-${a.id}`}>
+                              <div className="space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="font-semibold text-sm text-[#111827]" style={{fontFamily:'Manrope'}}>{person?.name || "Bilinmeyen kişi"}</div>
+                                  <span className={`badge-soft ${statusColor}`}>{a.status}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-[#6B7280]">
+                                  <Clock className="w-3 h-3" />
+                                  <span>{a.date?.slice(0,10)} {time && `· ${time}`} · {a.duration_min || 30} dk</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-xs text-[#6B7280]">
+                                  <User className="w-3 h-3" />
+                                  <span>{a.type}</span>
+                                </div>
+                                {a.note && (
+                                  <div className="flex items-start gap-2 text-xs text-[#111827] pt-1 border-t border-[#F3F4F6]">
+                                    <FileText className="w-3 h-3 mt-0.5 shrink-0 text-[#6B7280]" />
+                                    <span className="leading-relaxed">{a.note}</span>
+                                  </div>
+                                )}
+                                {person && (
+                                  <Link to={`/customers/${person.id}`} className="block text-xs text-[#065F46] font-semibold hover:underline pt-1" data-testid={`apt-hover-link-${a.id}`}>
+                                    Müşteri profiline git →
+                                  </Link>
+                                )}
+                              </div>
+                            </HoverCardContent>
+                          </HoverCard>
                         )}
                       </Draggable>
-                    ))}
+                      );
+                    })}
                     {items.length > 3 && <div className="text-[10px] text-[#6B7280]">+{items.length - 3} daha</div>}
                     {provided.placeholder}
                   </div>
