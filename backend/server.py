@@ -581,6 +581,27 @@ async def person_referrals(pid: str, current=Depends(current_user_dep)):
     return docs
 
 
+@api.get("/dashboard/top-referrers")
+async def top_referrers(limit: int = 5, current=Depends(current_user_dep)):
+    """Top N persons by number of referrals brought (only those with >= 2)."""
+    pipeline = [
+        {"$match": {"referred_by_person_id": {"$ne": None}}},
+        {"$group": {"_id": "$referred_by_person_id", "count": {"$sum": 1}}},
+        {"$match": {"count": {"$gte": 2}}},
+        {"$sort": {"count": -1}},
+        {"$limit": max(1, min(limit, 20))},
+    ]
+    results = []
+    async for doc in db.persons.aggregate(pipeline):
+        p = await db.persons.find_one(
+            {"id": doc["_id"]},
+            {"_id": 0, "id": 1, "name": 1, "lifecycle_status": 1, "phone": 1},
+        )
+        if p:
+            results.append({**p, "count": doc["count"]})
+    return results
+
+
 @api.get("/persons/{pid}")
 async def get_person(pid: str, current=Depends(current_user_dep)):
     p = await db.persons.find_one({"id": pid}, {"_id": 0})
@@ -589,6 +610,26 @@ async def get_person(pid: str, current=Depends(current_user_dep)):
     if current.get("role") != "admin" and p.get("assigned_to") != current["id"]:
         raise HTTPException(403, "Bu kayda erişim yetkiniz yok")
     return p
+
+
+@api.delete("/persons/{pid}")
+async def delete_person(pid: str, current=Depends(current_user_dep)):
+    require_admin(current)
+    p = await db.persons.find_one({"id": pid})
+    if not p:
+        raise HTTPException(404, "Kayıt bulunamadı")
+    # Cascade delete related records
+    await db.memberships.delete_many({"person_id": pid})
+    await db.payments.delete_many({"person_id": pid})
+    await db.measurements.delete_many({"person_id": pid})
+    await db.appointments.delete_many({"person_id": pid})
+    await db.contacts.delete_many({"person_id": pid})
+    await db.product_sales.delete_many({"person_id": pid})
+    await db.tasks.delete_many({"person_id": pid})
+    # Clear referrals pointing to this person
+    await db.persons.update_many({"referred_by_person_id": pid}, {"$set": {"referred_by_person_id": None}})
+    await db.persons.delete_one({"id": pid})
+    return {"ok": True, "name": p.get("name")}
 
 
 @api.post("/persons")

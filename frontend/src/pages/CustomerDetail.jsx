@@ -5,6 +5,7 @@ import { formatDateTR, formatTRY, todayISO, useAuth, calcAge } from "../lib/auth
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Trash2, Users as UsersIcon, Star } from "lucide-react";
 import ReferralPicker from "../components/ReferralPicker";
+import { ReferralBadge } from "../components/ReferralBadge";
 
 const TABS = ["Genel Bakış", "İletişim", "Üyelikler", "Ödemeler", "Ölçümler", "Randevular", "Ürün Satışları", "Notlar"];
 
@@ -69,7 +70,10 @@ export default function CustomerDetail() {
       <button onClick={() => nav(-1)} className="text-sm text-[#6B7280] flex items-center gap-1 mb-3"><ArrowLeft className="w-4 h-4" /> Geri</button>
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-5">
         <div>
-          <h1 className="text-2xl font-extrabold" style={{fontFamily:'Manrope'}}>{p.name}</h1>
+          <h1 className="text-2xl font-extrabold flex items-center gap-2 flex-wrap" style={{fontFamily:'Manrope'}}>
+            {p.name}
+            <ReferralBadge count={referrals.length} size="lg" />
+          </h1>
           <div className="text-sm text-[#6B7280] mt-1">{p.phone || "-"} · {p.instagram || ""}</div>
         </div>
         <span className={`badge-soft ${p.lifecycle_status === "customer" ? "bg-emerald-100 text-emerald-800" : "bg-purple-100 text-purple-800"}`}>

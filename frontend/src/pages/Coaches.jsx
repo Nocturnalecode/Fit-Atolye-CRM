@@ -1,16 +1,33 @@
 import React, { useEffect, useState } from "react";
-import { api } from "../lib/api";
+import { api, formatError } from "../lib/api";
 import { useAuth } from "../lib/auth";
 import { Link } from "react-router-dom";
-import { Users, UserCheck, GraduationCap, Calendar, CheckCircle2, Clock, Mail, TrendingUp } from "lucide-react";
+import { Users, UserCheck, GraduationCap, Calendar, CheckCircle2, Clock, Mail, TrendingUp, Trash2 } from "lucide-react";
+import { toast } from "sonner";
 
 export default function Coaches() {
-  const { isAdmin } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [stats, setStats] = useState(null);
 
-  useEffect(() => {
+  const load = () => {
     if (isAdmin) api.get("/coaches/stats").then((r) => setStats(r.data));
-  }, [isAdmin]);
+  };
+  useEffect(() => { load(); }, [isAdmin]);
+
+  const handleDelete = async (c) => {
+    if (c.id === user?.id) { toast.error("Kendi hesabınızı silemezsiniz"); return; }
+    const msg = c.active_customers > 0 || c.leads > 0
+      ? `"${c.name}" adlı koçu silmek istediğinize emin misiniz?\n\n${c.active_customers} aktif müşteri ve ${c.leads} potansiyel müşterinin ataması kaldırılacak (kayıtlar silinmez).\n\nBu işlem geri alınamaz.`
+      : `"${c.name}" adlı koçu kalıcı olarak silmek istediğinize emin misiniz?\n\nBu işlem geri alınamaz.`;
+    if (!window.confirm(msg)) return;
+    try {
+      await api.delete(`/users/${c.id}`);
+      toast.success(`${c.name} silindi`);
+      load();
+    } catch (e) {
+      toast.error(formatError(e.response?.data?.detail) || "Silme başarısız");
+    }
+  };
 
   if (!isAdmin) return <div className="p-8 text-[#6B7280]">Sadece yönetici erişebilir.</div>;
   if (!stats) return <div className="p-8 text-[#6B7280]">Yükleniyor...</div>;
@@ -50,6 +67,16 @@ export default function Coaches() {
                 </div>
               </div>
               {c.overdue_tasks > 0 && <span className="badge-soft bg-red-100 text-red-700">⚠ {c.overdue_tasks}</span>}
+              {c.id !== user?.id && (
+                <button
+                  onClick={() => handleDelete(c)}
+                  className="text-red-500 hover:text-red-700 p-1.5 rounded hover:bg-red-50 transition ml-1"
+                  title="Beslenme koçunu sil"
+                  data-testid={`coach-delete-${c.id}`}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
             </div>
 
             <div className="grid grid-cols-3 gap-3 mb-4">

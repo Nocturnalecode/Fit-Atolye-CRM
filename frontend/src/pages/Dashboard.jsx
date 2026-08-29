@@ -3,7 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth, formatTRY, formatDateTR } from "../lib/auth";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { AlertTriangle, Calendar, CheckCircle2, Clock, Users, TrendingUp, X, ChevronRight, Cake } from "lucide-react";
+import { AlertTriangle, Calendar, CheckCircle2, Clock, Users, TrendingUp, X, ChevronRight, Cake, Award, Crown } from "lucide-react";
+import { ReferralBadge } from "../components/ReferralBadge";
 
 const COLORS = ["#065F46", "#0D9488", "#34D399", "#A7F3D0", "#FBBF24", "#F87171"];
 
@@ -11,9 +12,13 @@ export default function Dashboard() {
   const { user, isAdmin } = useAuth();
   const [data, setData] = useState(null);
   const [drill, setDrill] = useState(null); // {kind, title}
+  const [topReferrers, setTopReferrers] = useState([]);
 
   useEffect(() => {
     api.get("/dashboard").then((r) => setData(r.data));
+    api.get("/dashboard/top-referrers", { params: { limit: 5 } })
+      .then((r) => setTopReferrers(r.data || []))
+      .catch(() => setTopReferrers([]));
   }, []);
 
   if (!data) return <div className="p-8 text-[#6B7280]">Yükleniyor...</div>;
@@ -56,6 +61,37 @@ export default function Dashboard() {
           </button>
         ))}
       </div>
+
+      {topReferrers.length > 0 && (
+        <div className="bg-gradient-to-r from-amber-50 via-yellow-50 to-purple-50 border border-amber-200 rounded-xl p-4" data-testid="top-referrers-strip">
+          <div className="flex items-center gap-2 mb-3">
+            <Crown className="w-4 h-4 text-amber-600" />
+            <h3 className="font-bold text-[#111827]" style={{fontFamily:'Manrope'}}>En Çok Referans Getirenler</h3>
+            <span className="text-xs text-[#6B7280]">· Elçilerimiz</span>
+          </div>
+          <div className="flex flex-wrap gap-3">
+            {topReferrers.map((r, i) => {
+              const route = r.lifecycle_status === "lead" ? `/leads/${r.id}` : `/customers/${r.id}`;
+              const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : "";
+              return (
+                <Link
+                  key={r.id}
+                  to={route}
+                  className="flex items-center gap-2 bg-white rounded-lg border border-amber-200 px-3 py-2 hover:border-amber-400 hover:shadow-sm transition"
+                  data-testid={`top-referrer-${r.id}`}
+                >
+                  {medal && <span className="text-lg leading-none">{medal}</span>}
+                  <div className="flex flex-col min-w-0">
+                    <div className="text-sm font-semibold text-[#111827] truncate max-w-[180px]">{r.name}</div>
+                    <div className="text-[11px] text-[#6B7280]">{r.count} referans</div>
+                  </div>
+                  <ReferralBadge count={r.count} />
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white border border-[#E5E7EB] rounded-xl p-5">

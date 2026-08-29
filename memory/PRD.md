@@ -14,7 +14,10 @@ Turkish CRM web app for FitAtölye (health/fitness/nutrition consultancy) to pre
 - **DB Collections**: users, persons (unified leads/customers/graduates via lifecycle_status), contacts, tasks, appointments, memberships, payments, measurements, products, product_sales, sources, sales_stages, response_categories, negative_reasons, tags, targets, settings, login_attempts
 
 ## What's Been Implemented (2026-02)
+- ✅ **Referans Rozeti & Top Referrers (Feb 2026)**: 2-4 referans → "Elçi" rozeti (mor), 5+ referans → "Küçük Ortak" rozeti (altın gradient). Rozet Customers listesinde ad yanında, CustomerDetail başlığında görünüyor. Dashboard'a "En Çok Referans Getirenler · Elçilerimiz" şeridi eklendi (top 5, 🥇🥈🥉 madalya) — `GET /api/dashboard/top-referrers` endpoint'i. `/app/frontend/src/components/ReferralBadge.jsx` paylaşımlı bileşen.
+- ✅ **Müşteri & Beslenme Koçu Silme (Feb 2026)**: Aktif Müşteriler tablosuna kırmızı çöp ikonu + native confirm() ile "emin misiniz" onayı + toast bildirim. Backend `DELETE /api/persons/{pid}` (admin only) tüm ilişkili kayıtları cascade siler (membership, payment, measurement, appointment, contact, product_sales, tasks) + referred_by_person_id temizler. Coaches sayfasında her kartın üstünde sil ikonu — mevcut `DELETE /api/users/{id}` endpoint'i kullanılıyor, admin kendi hesabını silemiyor.
 - ✅ **Referans Ağacı UI (Feb 2026)**: Customer/Lead detail page "Genel Bakış" tab shows "Bu müşteri N kişiyi getirdi" card with star icons + clickable list of referred persons. KPI card "Getirdiği Referans" added to summary. Aktif Müşteriler listesinde ad yanında referans sayısı kadar ⭐ (max 5, sonrası +N badge). Endpoints: `GET /api/persons/referrals/counts`, `GET /api/persons/{id}/referrals`. Fixed missing `</div>` closing tag that broke JSX compile.
+
 
 - ✅ JWT auth with role-based access (admin/consultant) + brute-force protection
 - ✅ 9 modules: Dashboard, Leads (Kanban+List), Customers, Graduates, Calendar/Tasks, Reports, Products, Settings, Login
