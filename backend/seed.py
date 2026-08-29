@@ -17,7 +17,20 @@ async def seed_all(db):
     await _seed_users(db)
     await _seed_reference(db)
     await _seed_settings(db)
+    await _seed_wa_templates(db)
     await _seed_demo_persons(db)
+
+
+async def _seed_wa_templates(db):
+    if await db.wa_templates.count_documents({}) > 0:
+        return
+    templates = [
+        {"name": "Genel Karşılama", "content": "Merhaba {name}, ben {consultant} - FitAtölye danışmanınızım. Görüşme talebiniz hakkında size ulaşıyorum. 🌿", "is_default": True, "active": True},
+        {"name": "Randevu Hatırlatma", "content": "Merhaba {name}, {consultant} olarak yaklaşan randevunuzu hatırlatmak istedim. Görüşmek üzere! 📅", "is_default": False, "active": True},
+        {"name": "Kısa Takip", "content": "Merhaba {name}, FitAtölye'den {consultant}. Müsait olduğunuzda kısa bir görüşme yapabilir miyiz? 🙋‍♀️", "is_default": False, "active": True},
+    ]
+    for t in templates:
+        await db.wa_templates.insert_one({"id": _id(), "created_at": now(), **t})
 
 
 async def _seed_users(db):

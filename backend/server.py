@@ -1249,6 +1249,47 @@ async def export_report(fmt: str, user_id: Optional[str] = None, current=Depends
     raise HTTPException(400, "Geçersiz format")
 
 
+# --- WhatsApp Templates ---
+class WATemplateBody(BaseModel):
+    name: str
+    content: str
+    active: bool = True
+    is_default: bool = False
+
+
+@api.get("/wa-templates")
+async def list_wa_templates(current=Depends(current_user_dep)):
+    items = await db.wa_templates.find({"active": True}, {"_id": 0}).sort("is_default", -1).to_list(200)
+    return items
+
+
+@api.post("/wa-templates")
+async def create_wa_template(body: WATemplateBody, current=Depends(current_user_dep)):
+    require_admin(current)
+    if body.is_default:
+        await db.wa_templates.update_many({}, {"$set": {"is_default": False}})
+    tpl = {"id": new_id(), "created_at": now_iso(), **body.model_dump()}
+    await db.wa_templates.insert_one(tpl)
+    tpl.pop("_id", None)
+    return tpl
+
+
+@api.patch("/wa-templates/{tid}")
+async def update_wa_template(tid: str, body: WATemplateBody, current=Depends(current_user_dep)):
+    require_admin(current)
+    if body.is_default:
+        await db.wa_templates.update_many({"id": {"$ne": tid}}, {"$set": {"is_default": False}})
+    await db.wa_templates.update_one({"id": tid}, {"$set": body.model_dump()})
+    return await db.wa_templates.find_one({"id": tid}, {"_id": 0})
+
+
+@api.delete("/wa-templates/{tid}")
+async def delete_wa_template(tid: str, current=Depends(current_user_dep)):
+    require_admin(current)
+    await db.wa_templates.delete_one({"id": tid})
+    return {"ok": True}
+
+
 # --- Settings ---
 @api.get("/settings")
 async def get_settings(current=Depends(current_user_dep)):

@@ -19,9 +19,13 @@ export default function Settings() {
   const [users, setUsers] = useState([]);
   const [settings, setSettings] = useState(null);
   const [showUser, setShowUser] = useState(false);
+  const [waTemplates, setWaTemplates] = useState([]);
+  const [waEditing, setWaEditing] = useState(null);
 
-  const load = () => api.get(`/ref/${active}`).then((r) => setItems(r.data));
-  useEffect(() => { load(); }, [active]); // eslint-disable-line
+  const isRef = REFS.map(([k]) => k).includes(active);
+  const load = () => { if (isRef) api.get(`/ref/${active}`).then((r) => setItems(r.data)); };
+  const loadWa = () => api.get("/wa-templates").then((r) => setWaTemplates(r.data));
+  useEffect(() => { load(); if (active === "wa") loadWa(); }, [active]); // eslint-disable-line
   useEffect(() => {
     if (isAdmin) {
       api.get("/users").then((r) => setUsers(r.data));
@@ -49,6 +53,7 @@ export default function Settings() {
         {REFS.map(([k, l]) => <button key={k} className={active === k ? "active" : ""} onClick={() => setActive(k)} data-testid={`settings-tab-${k}`}>{l}</button>)}
         <button className={active === "users" ? "active" : ""} onClick={() => setActive("users")}>Kullanıcılar</button>
         <button className={active === "auto" ? "active" : ""} onClick={() => setActive("auto")}>Otomasyon</button>
+        <button className={active === "wa" ? "active" : ""} onClick={() => setActive("wa")} data-testid="settings-tab-wa">WhatsApp Şablonları</button>
       </div>
 
       {REFS.map(([k]) => k).includes(active) && (
@@ -102,6 +107,39 @@ export default function Settings() {
         </div>
       )}
 
+      {active === "wa" && (
+        <div className="bg-white border rounded-xl p-5">
+          <div className="flex justify-between mb-4">
+            <div>
+              <h3 className="font-bold" style={{fontFamily:'Manrope'}}>WhatsApp Şablonları</h3>
+              <p className="text-xs text-[#6B7280] mt-0.5">
+                Değişkenler: <code className="bg-[#F3F4F6] px-1 rounded">{"{name}"}</code> · <code className="bg-[#F3F4F6] px-1 rounded">{"{consultant}"}</code>
+              </p>
+            </div>
+            <button className="btn-primary" onClick={() => setWaEditing({ name: "", content: "Merhaba {name}, ben {consultant} - FitAtölye danışmanınızım.", is_default: false, active: true })} data-testid="add-wa-tpl">Yeni Şablon</button>
+          </div>
+          <div className="space-y-2">
+            {waTemplates.length === 0 ? <div className="text-center py-6 text-sm text-[#6B7280]">Şablon yok.</div> : waTemplates.map((t) => (
+              <div key={t.id} className="p-3 border rounded-lg">
+                <div className="flex justify-between items-start mb-1 gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-sm">{t.name}</span>
+                    {t.is_default && <span className="badge-soft bg-emerald-100 text-emerald-800">Varsayılan</span>}
+                  </div>
+                  <div className="flex gap-2 shrink-0">
+                    <button className="text-xs underline" onClick={() => setWaEditing(t)} data-testid={`edit-wa-${t.id}`}>Düzenle</button>
+                    <button className="text-xs underline text-red-500" onClick={async () => { if (window.confirm("Silinsin mi?")) { await api.delete(`/wa-templates/${t.id}`); loadWa(); } }}>Sil</button>
+                  </div>
+                </div>
+                <p className="text-xs text-[#6B7280]">{t.content}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {waEditing && <WATemplateForm tpl={waEditing} onClose={() => setWaEditing(null)} onSaved={() => { loadWa(); setWaEditing(null); }} />}
+
       {showUser && <UserForm onClose={() => setShowUser(false)} onSaved={() => api.get("/users").then((r) => setUsers(r.data))} />}
     </div>
   );
@@ -130,6 +168,43 @@ function UserForm({ onClose, onSaved }) {
         <div className="flex justify-end gap-2 mt-5">
           <button className="btn-ghost" onClick={onClose}>İptal</button>
           <button className="btn-primary" onClick={submit} data-testid="user-save">Kaydet</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function WATemplateForm({ tpl, onClose, onSaved }) {
+  const [f, setF] = useState(tpl);
+  const submit = async () => {
+    try {
+      const body = { name: f.name, content: f.content, is_default: !!f.is_default, active: f.active !== false };
+      if (f.id) await api.patch(`/wa-templates/${f.id}`, body);
+      else await api.post("/wa-templates", body);
+      toast.success("Kaydedildi"); onSaved();
+    } catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+  };
+  const preview = (f.content || "").replace(/\{name\}/g, "Ahmet").replace(/\{consultant\}/g, "Ayşe Demir");
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-lg p-6" data-testid="wa-tpl-form">
+        <h2 className="font-bold text-lg mb-4" style={{fontFamily:'Manrope'}}>{f.id ? "Şablonu Düzenle" : "Yeni Şablon"}</h2>
+        <div className="space-y-3">
+          <div><label className="text-xs font-semibold">Şablon Adı *</label><input className="w-full border rounded-lg px-3 py-2 text-sm mt-1" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="wa-tpl-name" /></div>
+          <div>
+            <label className="text-xs font-semibold">İçerik *</label>
+            <textarea className="w-full border rounded-lg px-3 py-2 text-sm mt-1" rows={4} value={f.content} onChange={(e) => setF({ ...f, content: e.target.value })} data-testid="wa-tpl-content" />
+            <p className="text-[11px] text-[#6B7280] mt-1">Değişken: {"{name}"} kişi adı · {"{consultant}"} danışman adı</p>
+          </div>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={!!f.is_default} onChange={(e) => setF({ ...f, is_default: e.target.checked })} data-testid="wa-tpl-default" /> Varsayılan yap</label>
+          <div className="bg-[#F0FDF4] border border-emerald-200 rounded-lg p-3 text-xs">
+            <div className="font-semibold text-[#065F46] mb-1">Önizleme:</div>
+            <div className="text-[#111827]">{preview}</div>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <button className="btn-ghost" onClick={onClose}>İptal</button>
+          <button className="btn-primary" onClick={submit} data-testid="wa-tpl-save">Kaydet</button>
         </div>
       </div>
     </div>

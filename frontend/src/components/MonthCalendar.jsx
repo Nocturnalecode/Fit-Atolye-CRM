@@ -27,6 +27,7 @@ function buildMonthGrid(year, month) {
 export default function MonthCalendar({ appointments, onChanged }) {
   const today = new Date();
   const [cursor, setCursor] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
+  const [pending, setPending] = useState(null); // {apt, newDate, newIso}
 
   const cells = useMemo(() => buildMonthGrid(cursor.getFullYear(), cursor.getMonth()), [cursor]);
 
@@ -40,21 +41,27 @@ export default function MonthCalendar({ appointments, onChanged }) {
     return m;
   }, [appointments]);
 
-  const onDragEnd = async (result) => {
+  const onDragEnd = (result) => {
     if (!result.destination) return;
     const aid = result.draggableId;
     const newDate = result.destination.droppableId;
     const apt = appointments.find((a) => a.id === aid);
     if (!apt) return;
-    // preserve time part if present
+    if ((apt.date || "").slice(0, 10) === newDate) return; // no change
     const timePart = (apt.date || "").includes("T") ? apt.date.slice(10) : "T09:00";
-    const newIso = newDate + timePart;
+    setPending({ apt, newDate, newIso: newDate + timePart });
+  };
+
+  const confirmMove = async () => {
+    if (!pending) return;
     try {
-      await api.patch(`/appointments/${aid}`, { date: newIso });
+      await api.patch(`/appointments/${pending.apt.id}`, { date: pending.newIso });
       toast.success("Randevu taşındı");
       onChanged?.();
     } catch (e) {
       toast.error("Taşıma başarısız");
+    } finally {
+      setPending(null);
     }
   };
 
@@ -118,6 +125,24 @@ export default function MonthCalendar({ appointments, onChanged }) {
           })}
         </div>
       </DragDropContext>
+
+      {pending && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={() => setPending(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-sm p-6" onClick={(e) => e.stopPropagation()} data-testid="move-confirm">
+            <h3 className="font-bold text-lg mb-2" style={{fontFamily:'Manrope'}}>Randevuyu Taşı</h3>
+            <p className="text-sm text-[#6B7280] mb-4">
+              <span className="font-semibold text-[#111827]">{pending.apt.type}</span> randevusu <br />
+              <span className="text-[#DC2626]">{(pending.apt.date || "").slice(0, 10)}</span> tarihinden <br />
+              <span className="text-[#065F46] font-semibold">{pending.newDate}</span> tarihine taşınacak. <br /><br />
+              Onaylıyor musunuz?
+            </p>
+            <div className="flex justify-end gap-2">
+              <button className="btn-ghost" onClick={() => setPending(null)} data-testid="move-cancel">Vazgeç</button>
+              <button className="btn-primary" onClick={confirmMove} data-testid="move-confirm-btn">Evet, Taşı</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

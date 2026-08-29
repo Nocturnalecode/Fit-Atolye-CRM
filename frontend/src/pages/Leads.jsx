@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { api, formatError } from "../lib/api";
 import { useAuth, formatDateTR, todayISO } from "../lib/auth";
-import { whatsappLink } from "../lib/whatsapp";
+import { normalizePhone } from "../lib/whatsapp";
+import WhatsAppPicker from "../components/WhatsAppPicker";
 import { toast } from "sonner";
 import { Plus, LayoutGrid, List, Search, X, Filter, MessageCircle } from "lucide-react";
 
@@ -17,6 +18,7 @@ export default function Leads() {
   const [filters, setFilters] = useState({ q: "", source_id: "", assigned_to: "", priority: "", archived: false });
   const [showForm, setShowForm] = useState(false);
   const [selected, setSelected] = useState([]);
+  const [waTarget, setWaTarget] = useState(null);
 
   const reload = async () => {
     const params = { lifecycle: "lead", ...filters };
@@ -140,7 +142,7 @@ export default function Leads() {
                         {items.map((p, idx) => (
                           <Draggable key={p.id} draggableId={p.id} index={idx}>
                             {(prov, snap) => {
-                              const wa = whatsappLink(p.phone, p.name, userName(p.assigned_to));
+                              const canWa = !!normalizePhone(p.phone);
                               return (
                               <div
                                 ref={prov.innerRef}
@@ -160,16 +162,15 @@ export default function Leads() {
                                     {p.next_followup_date && <div className="text-[#065F46]">Takip: {formatDateTR(p.next_followup_date)}</div>}
                                   </div>
                                 </Link>
-                                {wa && (
-                                  <a
-                                    href={wa} target="_blank" rel="noreferrer"
-                                    onClick={(e) => e.stopPropagation()}
+                                {canWa && (
+                                  <button
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setWaTarget({ phone: p.phone, name: p.name, consultant: userName(p.assigned_to) }); }}
                                     className="absolute top-2 right-2 w-7 h-7 rounded-full bg-[#25D366] hover:bg-[#1FB558] flex items-center justify-center text-white transition-colors"
                                     title={`WhatsApp: ${p.phone}`}
                                     data-testid={`wa-btn-${p.id}`}
                                   >
                                     <MessageCircle className="w-3.5 h-3.5" />
-                                  </a>
+                                  </button>
                                 )}
                               </div>
                               );
@@ -197,7 +198,7 @@ export default function Leads() {
             </thead>
             <tbody>
               {persons.map((p) => {
-                const wa = whatsappLink(p.phone, p.name, userName(p.assigned_to));
+                const canWa = !!normalizePhone(p.phone);
                 return (
                 <tr key={p.id}>
                   {isAdmin && (
@@ -217,10 +218,10 @@ export default function Leads() {
                   </td>
                   <td className="text-sm text-[#6B7280]">{formatDateTR(p.next_followup_date)}</td>
                   <td>
-                    {wa ? (
-                      <a href={wa} target="_blank" rel="noreferrer" className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#25D366] hover:bg-[#1FB558] text-white" title={`WhatsApp: ${p.phone}`} data-testid={`wa-row-${p.id}`}>
+                    {canWa ? (
+                      <button onClick={() => setWaTarget({ phone: p.phone, name: p.name, consultant: userName(p.assigned_to) })} className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-[#25D366] hover:bg-[#1FB558] text-white" title={`WhatsApp: ${p.phone}`} data-testid={`wa-row-${p.id}`}>
                         <MessageCircle className="w-3.5 h-3.5" />
-                      </a>
+                      </button>
                     ) : <span className="text-xs text-[#9CA3AF]">-</span>}
                   </td>
                 </tr>
@@ -233,6 +234,7 @@ export default function Leads() {
       )}
 
       {showForm && <LeadForm onClose={() => setShowForm(false)} onSaved={reload} stages={stages} sources={sources} users={users} isAdmin={isAdmin} currentUserId={user.id} />}
+      {waTarget && <WhatsAppPicker phone={waTarget.phone} personName={waTarget.name} consultantName={waTarget.consultant} onClose={() => setWaTarget(null)} />}
     </div>
   );
 }
