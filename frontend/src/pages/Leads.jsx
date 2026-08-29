@@ -5,6 +5,7 @@ import { api, formatError } from "../lib/api";
 import { useAuth, formatDateTR, todayISO } from "../lib/auth";
 import { normalizePhone } from "../lib/whatsapp";
 import WhatsAppPicker from "../components/WhatsAppPicker";
+import ReferralPicker from "../components/ReferralPicker";
 import { toast } from "sonner";
 import { Plus, LayoutGrid, List, Search, X, Filter, MessageCircle } from "lucide-react";
 
@@ -243,16 +244,23 @@ function LeadForm({ onClose, onSaved, stages, sources, users, isAdmin, currentUs
   const [f, setF] = useState({
     name: "", phone: "", instagram: "", source_id: sources[0]?.id || "",
     assigned_to: isAdmin ? "" : currentUserId,
-    request_date: todayISO(), priority: "normal", last_note: "", birth_date: ""
+    request_date: todayISO(), priority: "normal", last_note: "", birth_date: "",
+    referred_by_person_id: null,
   });
+  const [referrerName, setReferrerName] = useState("");
   const [err, setErr] = useState("");
   const [dup, setDup] = useState(null);
+
+  const selectedSource = sources.find((s) => s.id === f.source_id);
+  const isReferral = selectedSource && selectedSource.name.toLowerCase().includes("referans");
 
   const submit = async (force = false) => {
     setErr("");
     try {
       const payload = { ...f, force };
       if (!payload.birth_date) delete payload.birth_date;
+      if (!isReferral) payload.referred_by_person_id = null;
+      if (!payload.referred_by_person_id) delete payload.referred_by_person_id;
       const { data } = await api.post("/persons", payload);
       if (data.duplicate) { setDup(data.existing); return; }
       toast.success("Potansiyel müşteri eklendi");
@@ -293,6 +301,15 @@ function LeadForm({ onClose, onSaved, stages, sources, users, isAdmin, currentUs
               <Field label="Kaynak *"><select className="input" value={f.source_id} onChange={(e) => setF({ ...f, source_id: e.target.value })} data-testid="lead-source">{sources.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select></Field>
               <Field label="Talep Tarihi *"><input type="date" className="input" value={f.request_date} onChange={(e) => setF({ ...f, request_date: e.target.value })} /></Field>
             </div>
+            {isReferral && (
+              <Field label="Kimin Referansı? *">
+                <ReferralPicker
+                  value={f.referred_by_person_id}
+                  valueName={referrerName}
+                  onChange={(id, name) => { setF({ ...f, referred_by_person_id: id }); setReferrerName(name || ""); }}
+                />
+              </Field>
+            )}
             {isAdmin && (
               <Field label="Sorumlu Beslenme Koçu *"><select className="input" value={f.assigned_to} onChange={(e) => setF({ ...f, assigned_to: e.target.value })} data-testid="lead-assigned"><option value="">Seçiniz</option>{users.filter((u) => u.role === "consultant").map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></Field>
             )}

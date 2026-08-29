@@ -100,6 +100,7 @@ class PersonCreate(BaseModel):
     next_followup_date: Optional[str] = None
     last_note: Optional[str] = None
     birth_date: Optional[str] = None
+    referred_by_person_id: Optional[str] = None
     force: bool = False
 
 
@@ -117,6 +118,7 @@ class PersonUpdate(BaseModel):
     next_followup_date: Optional[str] = None
     last_note: Optional[str] = None
     birth_date: Optional[str] = None
+    referred_by_person_id: Optional[str] = None
     archived: Optional[bool] = None
 
 
@@ -592,6 +594,7 @@ async def create_person(body: PersonCreate, current=Depends(current_user_dep)):
         "next_followup_date": body.next_followup_date,
         "last_note": body.last_note,
         "birth_date": body.birth_date,
+        "referred_by_person_id": body.referred_by_person_id,
         "lifecycle_status": "lead",
         "archived": False,
         "updated_at": now_iso(),
