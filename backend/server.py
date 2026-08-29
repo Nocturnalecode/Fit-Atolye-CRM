@@ -94,6 +94,7 @@ class PersonCreate(BaseModel):
     tags: List[str] = []
     next_followup_date: Optional[str] = None
     last_note: Optional[str] = None
+    birth_date: Optional[str] = None
     force: bool = False
 
 
@@ -110,6 +111,7 @@ class PersonUpdate(BaseModel):
     tags: Optional[List[str]] = None
     next_followup_date: Optional[str] = None
     last_note: Optional[str] = None
+    birth_date: Optional[str] = None
     archived: Optional[bool] = None
 
 
@@ -518,6 +520,7 @@ async def create_person(body: PersonCreate, current=Depends(current_user_dep)):
         "tags": body.tags,
         "next_followup_date": body.next_followup_date,
         "last_note": body.last_note,
+        "birth_date": body.birth_date,
         "lifecycle_status": "lead",
         "archived": False,
         "updated_at": now_iso(),
@@ -1132,6 +1135,13 @@ async def dashboard(current=Depends(current_user_dep)):
         converted = await db.persons.count_documents({"assigned_to": u["id"], "lifecycle_status": {"$in": ["customer", "graduate"]}})
         rate = round((converted / total * 100), 1) if total else 0
         conv_by_user.append({"name": u["name"], "total": total, "converted": converted, "rate": rate})
+    # Birthdays today (match MM-DD of birth_date)
+    today_md = datetime.now(timezone.utc).strftime("%m-%d")
+    bd_filter = {"birth_date": {"$ne": None}}
+    if role != "admin":
+        bd_filter["assigned_to"] = current["id"]
+    bd_docs = await db.persons.find(bd_filter, {"_id": 0, "id": 1, "name": 1, "birth_date": 1, "phone": 1, "lifecycle_status": 1, "assigned_to": 1}).to_list(5000)
+    birthdays_today = [p for p in bd_docs if p.get("birth_date") and len(p["birth_date"]) >= 10 and p["birth_date"][5:10] == today_md]
     return {
         "unassigned_leads": unassigned_count,
         "today_tasks": today_tasks,
@@ -1144,6 +1154,7 @@ async def dashboard(current=Depends(current_user_dep)):
         "by_stage": [{"name": k, "value": v} for k, v in by_stage.items()],
         "by_negative_reason": [{"name": k, "value": v} for k, v in by_neg.items()],
         "conversion_by_consultant": conv_by_user,
+        "birthdays_today": birthdays_today,
     }
 
 

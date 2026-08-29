@@ -78,6 +78,10 @@ export default function LeadDetail() {
                 </select>
               </div>
               <Row label="Talep Tarihi" v={formatDateTR(p.request_date)} />
+              <div className="flex justify-between items-center gap-2">
+                <span className="text-[#6B7280]">Doğum Tarihi</span>
+                <input type="date" defaultValue={p.birth_date || ""} onBlur={(e) => e.target.value !== (p.birth_date || "") && update({ birth_date: e.target.value || null })} className="text-sm border border-[#E5E7EB] rounded px-2 py-1 max-w-[60%]" data-testid="lead-birth-input" />
+              </div>
               <Row label="Son Güncelleme" v={formatDateTimeTR(p.updated_at)} />
               <Row label="Güncelleyen" v={p.updated_by} />
             </div>

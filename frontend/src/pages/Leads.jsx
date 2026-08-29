@@ -243,7 +243,7 @@ function LeadForm({ onClose, onSaved, stages, sources, users, isAdmin, currentUs
   const [f, setF] = useState({
     name: "", phone: "", instagram: "", source_id: sources[0]?.id || "",
     assigned_to: isAdmin ? "" : currentUserId,
-    request_date: todayISO(), priority: "normal", last_note: ""
+    request_date: todayISO(), priority: "normal", last_note: "", birth_date: ""
   });
   const [err, setErr] = useState("");
   const [dup, setDup] = useState(null);
@@ -251,7 +251,9 @@ function LeadForm({ onClose, onSaved, stages, sources, users, isAdmin, currentUs
   const submit = async (force = false) => {
     setErr("");
     try {
-      const { data } = await api.post("/persons", { ...f, force });
+      const payload = { ...f, force };
+      if (!payload.birth_date) delete payload.birth_date;
+      const { data } = await api.post("/persons", payload);
       if (data.duplicate) { setDup(data.existing); return; }
       toast.success("Potansiyel müşteri eklendi");
       onSaved(); onClose();
@@ -298,6 +300,7 @@ function LeadForm({ onClose, onSaved, stages, sources, users, isAdmin, currentUs
               <Field label="Öncelik"><select className="input" value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })}><option value="low">Düşük</option><option value="normal">Normal</option><option value="high">Yüksek</option></select></Field>
               <Field label="Sonraki Takip"><input type="date" className="input" value={f.next_followup_date || ""} onChange={(e) => setF({ ...f, next_followup_date: e.target.value })} /></Field>
             </div>
+            <Field label="Doğum Tarihi"><input type="date" className="input" value={f.birth_date} onChange={(e) => setF({ ...f, birth_date: e.target.value })} data-testid="lead-birth-date" /></Field>
             <Field label="Not"><textarea className="input" rows={2} value={f.last_note} onChange={(e) => setF({ ...f, last_note: e.target.value })} /></Field>
             {err && <div className="text-sm text-red-600" data-testid="lead-form-error">{err}</div>}
             <div className="flex gap-2 justify-end pt-2">

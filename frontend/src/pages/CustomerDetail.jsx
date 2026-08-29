@@ -84,6 +84,25 @@ export default function CustomerDetail() {
             <Info label="Aylık Ücret" v={formatTRY(activeMem?.monthly_fee)} />
             <Info label="Ödeme Yöntemi" v={activeMem?.payment_method} />
             <Info label="Ödeme Planı" v={activeMem?.payment_plan} />
+            <div>
+              <div className="text-xs text-[#6B7280]">Doğum Tarihi</div>
+              <input
+                type="date"
+                defaultValue={p.birth_date || ""}
+                onBlur={async (e) => {
+                  const v = e.target.value;
+                  if (v !== (p.birth_date || "")) {
+                    try {
+                      await api.patch(`/persons/${id}`, { birth_date: v || null });
+                      toast.success("Doğum tarihi güncellendi");
+                      load();
+                    } catch (err) { toast.error("Güncelleme başarısız"); }
+                  }
+                }}
+                className="text-sm font-semibold border border-[#E5E7EB] rounded px-2 py-1 mt-0.5"
+                data-testid="customer-birth-date"
+              />
+            </div>
           </div>
           {financial && (
             <div className="mt-5 border-t pt-4">

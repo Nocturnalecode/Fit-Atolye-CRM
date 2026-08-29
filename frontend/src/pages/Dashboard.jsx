@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { api } from "../lib/api";
 import { useAuth, formatTRY, formatDateTR } from "../lib/auth";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { AlertTriangle, Calendar, CheckCircle2, Clock, Users, TrendingUp, X, ChevronRight } from "lucide-react";
+import { AlertTriangle, Calendar, CheckCircle2, Clock, Users, TrendingUp, X, ChevronRight, Cake } from "lucide-react";
 
 const COLORS = ["#065F46", "#0D9488", "#34D399", "#A7F3D0", "#FBBF24", "#F87171"];
 
@@ -25,6 +25,7 @@ export default function Dashboard() {
     { kind: "today_apts", label: "Bugünkü Randevular", value: data.today_appointments, icon: Calendar, tone: "emerald", testid: "kpi-today-apts" },
     { kind: "active_customers", label: "Aktif Müşteriler", value: data.active_customers, icon: Users, tone: "emerald", testid: "kpi-active-customers" },
     { kind: "overdue_payments", label: "Gecikmiş Ödemeler", value: data.overdue_payments, icon: TrendingUp, tone: "red", testid: "kpi-overdue-payments" },
+    { kind: "birthdays_today", label: "Bugün Doğum Günü", value: (data.birthdays_today || []).length, icon: Cake, tone: "pink", testid: "kpi-birthdays" },
   ].filter(Boolean);
 
   return (
@@ -38,7 +39,7 @@ export default function Dashboard() {
         </p>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-7 gap-3">
         {cards.map((c) => (
           <button
             key={c.label}
@@ -47,7 +48,7 @@ export default function Dashboard() {
             data-testid={c.testid}
           >
             <div className="flex items-start justify-between mb-2">
-              <c.icon className={`w-4 h-4 ${c.tone === "red" ? "text-red-500" : c.tone === "amber" ? "text-amber-500" : "text-[#059669]"}`} />
+              <c.icon className={`w-4 h-4 ${c.tone === "red" ? "text-red-500" : c.tone === "amber" ? "text-amber-500" : c.tone === "pink" ? "text-pink-500" : "text-[#059669]"}`} />
               <ChevronRight className="w-3.5 h-3.5 text-[#9CA3AF] opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
             <div className="kpi-value">{c.value}</div>
@@ -142,6 +143,7 @@ function DrillModal({ kind, title, onClose }) {
       else if (kind === "today_apts") res = (await api.get("/appointments", { params: { date_from: today + "T00:00", date_to: today + "T23:59" } })).data;
       else if (kind === "active_customers") res = (await api.get("/persons", { params: { lifecycle: "customer" } })).data;
       else if (kind === "overdue_payments") res = (await api.get("/payments", { params: { overdue: true } })).data;
+      else if (kind === "birthdays_today") res = (await api.get("/dashboard")).data.birthdays_today || [];
       setItems(res);
       // load persons map for tasks/appointments/payments
       if (["today_tasks", "overdue_tasks", "today_apts", "overdue_payments"].includes(kind)) {
@@ -239,6 +241,20 @@ function DrillModal({ kind, title, onClose }) {
                   <Link key={a.id} to={route} onClick={onClose} className="block p-3 border border-[#E5E7EB] rounded-lg hover:border-[#065F46] hover:bg-[#F9FAFB]">{inner}</Link>
                 ) : (
                   <div key={a.id} className="p-3 border border-[#E5E7EB] rounded-lg">{inner}</div>
+                );
+              })}
+              {kind === "birthdays_today" && items.map((p) => {
+                const route = p.lifecycle_status === "lead" ? `/leads/${p.id}` : `/customers/${p.id}`;
+                return (
+                <Link key={p.id} to={route} onClick={onClose} className="block p-3 border border-[#E5E7EB] rounded-lg hover:border-[#065F46] hover:bg-[#F9FAFB]">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <div className="font-semibold text-sm">🎂 {p.name}</div>
+                      <div className="text-xs text-[#6B7280]">{p.phone || "-"} · Doğum: {formatDateTR(p.birth_date)}</div>
+                    </div>
+                    <span className="badge-soft bg-pink-100 text-pink-700">Bugün!</span>
+                  </div>
+                </Link>
                 );
               })}
               {kind === "overdue_payments" && items.map((p) => {
