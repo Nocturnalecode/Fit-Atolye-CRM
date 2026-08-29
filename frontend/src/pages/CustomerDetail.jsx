@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { api, formatError } from "../lib/api";
-import { formatDateTR, formatTRY, todayISO, useAuth } from "../lib/auth";
+import { formatDateTR, formatTRY, todayISO, useAuth, calcAge } from "../lib/auth";
 import { toast } from "sonner";
 import { ArrowLeft, Plus, Trash2 } from "lucide-react";
 
@@ -84,6 +84,7 @@ export default function CustomerDetail() {
             <Info label="Aylık Ücret" v={formatTRY(activeMem?.monthly_fee)} />
             <Info label="Ödeme Yöntemi" v={activeMem?.payment_method} />
             <Info label="Ödeme Planı" v={activeMem?.payment_plan} />
+            <Info label="Yaş" v={calcAge(p.birth_date) != null ? `${calcAge(p.birth_date)} yaşında` : "-"} />
             <div>
               <div className="text-xs text-[#6B7280]">Doğum Tarihi</div>
               <input

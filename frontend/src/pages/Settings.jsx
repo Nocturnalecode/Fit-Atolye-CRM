@@ -80,14 +80,33 @@ export default function Settings() {
             <button className="btn-primary" onClick={() => setShowUser(true)} data-testid="add-user-btn">Kullanıcı Ekle</button>
           </div>
           <table className="data-table">
-            <thead><tr><th>Ad</th><th>E-posta</th><th>Rol</th><th>Durum</th></tr></thead>
+            <thead><tr><th>Ad</th><th>E-posta</th><th>Rol</th><th>İşlem</th></tr></thead>
             <tbody>
               {users.map((u) => (
-                <tr key={u.id}>
+                <React.Fragment key={u.id}>
+                <tr>
                   <td>{u.name}</td><td>{u.email}</td>
                   <td>{u.role === "admin" ? "Yönetici" : "Danışman"}</td>
-                  <td><button className="text-xs underline" onClick={async () => { await api.patch(`/users/${u.id}`, { active: !u.active }); api.get("/users").then((r) => setUsers(r.data)); }}>{u.active ? "Aktif (pasife al)" : "Pasif (aktif yap)"}</button></td>
+                  <td>
+                    <button
+                      className="text-xs underline text-red-600 hover:text-red-800"
+                      data-testid={`delete-user-${u.id}`}
+                      onClick={async () => {
+                        const me = JSON.parse(localStorage.getItem("fitatolye_user") || "{}");
+                        if (u.id === me.id) { toast.error("Kendi hesabınızı silemezsiniz"); return; }
+                        if (!window.confirm(`${u.name} kullanıcısı silinsin mi? Bu işlem geri alınamaz. Kullanıcının potansiyelleri ve görevleri atanmamış olarak kalır.`)) return;
+                        try {
+                          await api.delete(`/users/${u.id}`);
+                          toast.success("Kullanıcı silindi");
+                          api.get("/users").then((r) => setUsers(r.data));
+                        } catch (e) {
+                          toast.error(formatError(e.response?.data?.detail));
+                        }
+                      }}
+                    >Sil</button>
+                  </td>
                 </tr>
+                </React.Fragment>
               ))}
             </tbody>
           </table>

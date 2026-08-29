@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../lib/api";
-import { formatDateTR, useAuth } from "../lib/auth";
+import { formatDateTR, useAuth, calcAge } from "../lib/auth";
 
 export default function Customers({ lifecycle = "customer", title = "Aktif Müşteriler" }) {
   const { isAdmin } = useAuth();
@@ -28,17 +28,18 @@ export default function Customers({ lifecycle = "customer", title = "Aktif Müş
 
       <div className="bg-white border border-[#E5E7EB] rounded-xl overflow-x-auto">
         <table className="data-table">
-          <thead><tr><th>Ad Soyad</th><th>Telefon</th><th>Danışman</th><th>Müşteri Olma Tarihi</th></tr></thead>
+          <thead><tr><th>Ad Soyad</th><th>Telefon</th><th>Yaş</th><th>Danışman</th><th>Müşteri Olma Tarihi</th></tr></thead>
           <tbody>
             {filtered.map((p) => (
               <tr key={p.id}>
                 <td><Link to={`/customers/${p.id}`} className="text-[#065F46] font-medium hover:underline" data-testid={`customer-row-${p.id}`}>{p.name}</Link></td>
                 <td>{p.phone || p.instagram || "-"}</td>
+                <td className="text-sm">{calcAge(p.birth_date) != null ? calcAge(p.birth_date) : "-"}</td>
                 <td>{userName(p.assigned_to)}</td>
                 <td className="text-sm text-[#6B7280]">{formatDateTR(p.customer_since)}</td>
               </tr>
             ))}
-            {filtered.length === 0 && <tr><td colSpan="4" className="text-center py-10 text-[#6B7280]">Kayıt yok.</td></tr>}
+            {filtered.length === 0 && <tr><td colSpan="5" className="text-center py-10 text-[#6B7280]">Kayıt yok.</td></tr>}
           </tbody>
         </table>
       </div>

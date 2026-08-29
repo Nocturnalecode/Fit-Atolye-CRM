@@ -365,6 +365,22 @@ async def update_user(user_id: str, body: UserUpdate, current=Depends(current_us
     return user
 
 
+@api.delete("/users/{user_id}")
+async def delete_user(user_id: str, current=Depends(current_user_dep)):
+    require_admin(current)
+    if user_id == current["id"]:
+        raise HTTPException(400, "Kendi hesabınızı silemezsiniz")
+    target = await db.users.find_one({"id": user_id})
+    if not target:
+        raise HTTPException(404, "Kullanıcı bulunamadı")
+    # Unassign persons owned by this user (data korunur, atama düşer)
+    await db.persons.update_many({"assigned_to": user_id}, {"$set": {"assigned_to": None}})
+    await db.tasks.update_many({"assigned_to": user_id}, {"$set": {"assigned_to": None}})
+    await db.appointments.update_many({"assigned_to": user_id}, {"$set": {"assigned_to": None}})
+    await db.users.delete_one({"id": user_id})
+    return {"ok": True}
+
+
 # --- Reference data (sources, stages, response categories, tags, negative reasons) ---
 def _ref_collection(kind: str):
     mapping = {

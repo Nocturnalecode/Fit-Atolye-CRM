@@ -18,7 +18,6 @@ async def seed_all(db):
     await _seed_reference(db)
     await _seed_settings(db)
     await _seed_wa_templates(db)
-    await _seed_demo_persons(db)
 
 
 async def _seed_wa_templates(db):
@@ -100,16 +99,6 @@ async def _seed_reference(db):
     if await db.tags.count_documents({}) == 0:
         for n in ["VIP", "Yakın Takip", "İkinci Görüşme", "Sabırlı"]:
             await db.tags.insert_one({"id": _id(), "name": n, "active": True})
-
-    if await db.products.count_documents({}) == 0:
-        for name, price in [
-            ("Protein Tozu 1kg", 850),
-            ("Multivitamin 60 tablet", 450),
-            ("Yağ Yakıcı", 620),
-            ("BCAA Amino", 720),
-            ("Kreatin Monohidrat 300g", 550),
-        ]:
-            await db.products.insert_one({"id": _id(), "name": name, "price": price, "active": True, "demo": True, "created_at": now()})
 
 
 async def _seed_settings(db):
