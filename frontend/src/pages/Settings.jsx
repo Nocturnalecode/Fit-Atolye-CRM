@@ -1,0 +1,137 @@
+import React, { useEffect, useState } from "react";
+import { api, formatError } from "../lib/api";
+import { useAuth } from "../lib/auth";
+import { toast } from "sonner";
+
+const REFS = [
+  ["sources", "Müşteri Kaynakları"],
+  ["stages", "Satış Aşamaları"],
+  ["response_categories", "Cevap Kategorileri"],
+  ["negative_reasons", "Olumsuzluk Nedenleri"],
+  ["tags", "Etiketler"],
+];
+
+export default function Settings() {
+  const { isAdmin } = useAuth();
+  const [active, setActive] = useState("sources");
+  const [items, setItems] = useState([]);
+  const [newName, setNewName] = useState("");
+  const [users, setUsers] = useState([]);
+  const [settings, setSettings] = useState(null);
+  const [showUser, setShowUser] = useState(false);
+
+  const load = () => api.get(`/ref/${active}`).then((r) => setItems(r.data));
+  useEffect(() => { load(); }, [active]); // eslint-disable-line
+  useEffect(() => {
+    if (isAdmin) {
+      api.get("/users").then((r) => setUsers(r.data));
+      api.get("/settings").then((r) => setSettings(r.data));
+    }
+  }, [isAdmin]);
+
+  const addItem = async () => {
+    if (!newName) return;
+    try { await api.post(`/ref/${active}`, { name: newName }); setNewName(""); load(); toast.success("Eklendi"); }
+    catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+  };
+  const toggle = async (it) => {
+    await api.patch(`/ref/${active}/${it.id}`, { active: !it.active });
+    load();
+  };
+
+  if (!isAdmin) return <div className="p-8 text-[#6B7280]">Sadece yönetici erişebilir.</div>;
+
+  return (
+    <div className="p-6 lg:p-8 max-w-4xl">
+      <h1 className="text-2xl font-extrabold mb-5" style={{fontFamily:'Manrope'}}>Ayarlar</h1>
+
+      <div className="pill-tabs mb-5">
+        {REFS.map(([k, l]) => <button key={k} className={active === k ? "active" : ""} onClick={() => setActive(k)} data-testid={`settings-tab-${k}`}>{l}</button>)}
+        <button className={active === "users" ? "active" : ""} onClick={() => setActive("users")}>Kullanıcılar</button>
+        <button className={active === "auto" ? "active" : ""} onClick={() => setActive("auto")}>Otomasyon</button>
+      </div>
+
+      {REFS.map(([k]) => k).includes(active) && (
+        <div className="bg-white border rounded-xl p-5">
+          <div className="flex gap-2 mb-4">
+            <input className="flex-1 border rounded-lg px-3 py-2 text-sm" placeholder="Yeni ekle..." value={newName} onChange={(e) => setNewName(e.target.value)} data-testid="ref-input" />
+            <button className="btn-primary" onClick={addItem} data-testid="ref-add">Ekle</button>
+          </div>
+          <div className="space-y-2">
+            {items.map((it) => (
+              <div key={it.id} className="flex justify-between items-center p-3 border rounded-lg">
+                <span className={it.active ? "" : "text-[#9CA3AF] line-through"}>{it.name}</span>
+                <button className="btn-ghost text-xs" onClick={() => toggle(it)}>{it.active ? "Pasife Al" : "Aktif Yap"}</button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {active === "users" && (
+        <div className="bg-white border rounded-xl p-5">
+          <div className="flex justify-between mb-4">
+            <h3 className="font-bold" style={{fontFamily:'Manrope'}}>Kullanıcılar</h3>
+            <button className="btn-primary" onClick={() => setShowUser(true)} data-testid="add-user-btn">Kullanıcı Ekle</button>
+          </div>
+          <table className="data-table">
+            <thead><tr><th>Ad</th><th>E-posta</th><th>Rol</th><th>Durum</th></tr></thead>
+            <tbody>
+              {users.map((u) => (
+                <tr key={u.id}>
+                  <td>{u.name}</td><td>{u.email}</td>
+                  <td>{u.role === "admin" ? "Yönetici" : "Danışman"}</td>
+                  <td><button className="text-xs underline" onClick={async () => { await api.patch(`/users/${u.id}`, { active: !u.active }); api.get("/users").then((r) => setUsers(r.data)); }}>{u.active ? "Aktif (pasife al)" : "Pasif (aktif yap)"}</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {active === "auto" && settings && (
+        <div className="bg-white border rounded-xl p-5 space-y-3">
+          <h3 className="font-bold mb-2" style={{fontFamily:'Manrope'}}>Otomasyon Ayarları</h3>
+          <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={settings.auto_enabled} onChange={(e) => setSettings({ ...settings, auto_enabled: e.target.checked })} /> Otomasyon aktif</label>
+          <NumRow label="Ulaşılamadı → gün sonra takip" v={settings.days_unreachable} k="days_unreachable" state={settings} set={setSettings} />
+          <NumRow label="Düşünecek → gün sonra takip" v={settings.days_thinking} k="days_thinking" state={settings} set={setSettings} />
+          <NumRow label="Randevuya gelmedi → aynı gün (0)" v={settings.days_no_show} k="days_no_show" state={settings} set={setSettings} />
+          <NumRow label="Üyelik bitişine gün kala görev" v={settings.renewal_task_days} k="renewal_task_days" state={settings} set={setSettings} />
+          <NumRow label="Üyelik bitişine gün kala hatırlatma" v={settings.renewal_reminder_days} k="renewal_reminder_days" state={settings} set={setSettings} />
+          <button className="btn-primary" onClick={async () => { await api.patch("/settings", settings); toast.success("Kaydedildi"); }} data-testid="save-settings">Kaydet</button>
+        </div>
+      )}
+
+      {showUser && <UserForm onClose={() => setShowUser(false)} onSaved={() => api.get("/users").then((r) => setUsers(r.data))} />}
+    </div>
+  );
+}
+
+function NumRow({ label, v, k, state, set }) {
+  return <div className="flex justify-between items-center"><span className="text-sm">{label}</span><input type="number" className="w-20 border rounded px-2 py-1 text-sm" value={v} onChange={(e) => set({ ...state, [k]: parseInt(e.target.value) })} /></div>;
+}
+
+function UserForm({ onClose, onSaved }) {
+  const [f, setF] = useState({ email: "", password: "", name: "", role: "consultant" });
+  const submit = async () => {
+    try { await api.post("/users", f); toast.success("Kullanıcı eklendi"); onSaved(); onClose(); }
+    catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl w-full max-w-md p-6">
+        <h2 className="font-bold text-lg mb-4" style={{fontFamily:'Manrope'}}>Yeni Kullanıcı</h2>
+        <div className="space-y-3">
+          <div><label className="text-xs font-semibold">Ad</label><input className="w-full border rounded-lg px-3 py-2 text-sm mt-1" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="user-name" /></div>
+          <div><label className="text-xs font-semibold">E-posta</label><input className="w-full border rounded-lg px-3 py-2 text-sm mt-1" value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} data-testid="user-email" /></div>
+          <div><label className="text-xs font-semibold">Şifre</label><input type="password" className="w-full border rounded-lg px-3 py-2 text-sm mt-1" value={f.password} onChange={(e) => setF({ ...f, password: e.target.value })} data-testid="user-password" /></div>
+          <div><label className="text-xs font-semibold">Rol</label><select className="w-full border rounded-lg px-3 py-2 text-sm mt-1" value={f.role} onChange={(e) => setF({ ...f, role: e.target.value })}><option value="consultant">Danışman</option><option value="admin">Yönetici</option></select></div>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <button className="btn-ghost" onClick={onClose}>İptal</button>
+          <button className="btn-primary" onClick={submit} data-testid="user-save">Kaydet</button>
+        </div>
+      </div>
+    </div>
+  );
+}

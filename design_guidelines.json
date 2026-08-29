@@ -1,0 +1,103 @@
+{
+  "project_name": "FitAtölye CRM",
+  "theme_strategy": {
+    "mode": "light",
+    "justification": "User specifically requested 'Açık tema' (Light theme) to convey a clean, professional, and clinical yet warm health consultancy environment."
+  },
+  "typography": {
+    "headings": {
+      "family": "Manrope, sans-serif",
+      "weights": ["600", "800"],
+      "usage": "Use for all module titles, KPI numbers, and Kanban column headers. Provides excellent numeric legibility and a modern, friendly but structural feel.",
+      "tracking": "tracking-tight"
+    },
+    "body": {
+      "family": "IBM Plex Sans, sans-serif",
+      "weights": ["400", "500"],
+      "usage": "Use for all data tables, CRM lists, patient notes, and forms. Extremely legible at small sizes for dense data.",
+      "tracking": "tracking-normal"
+    },
+    "forbidden_fonts": ["Inter", "Roboto", "Open Sans", "Space Grotesk"]
+  },
+  "colors": {
+    "archetype": "ORGANIC & EARTHY mixed with SWISS CLARITY",
+    "palette": {
+      "background": "#F9FAFB",
+      "surface": "#FFFFFF",
+      "primary": "#065F46",
+      "primary_hover": "#047857",
+      "accent_turquoise": "#0D9488",
+      "accent_mint_bg": "#D1FAE5",
+      "text_main": "#111827",
+      "text_muted": "#6B7280",
+      "border": "#E5E7EB",
+      "danger": "#DC2626",
+      "warning": "#D97706",
+      "success": "#059669"
+    },
+    "chart_palette": ["#065F46", "#0D9488", "#34D399", "#A7F3D0", "#FBBF24"],
+    "rules": [
+      "No full-screen gradients. Use solid warm off-white backgrounds.",
+      "Use #065F46 (Deep Emerald) as the primary brand color for main buttons and active states.",
+      "Use #0D9488 (Sophisticated Turquoise) strictly for data highlights, progress bars, and badges.",
+      "Never use #1B93A4 (Forbidden Teal)."
+    ]
+  },
+  "layouts": {
+    "global_structure": "Collapsible left sidebar (240px wide, white bg, 1px right border) + Main Content Area.",
+    "spacing_system": {
+      "dashboard_grid": "Tight gap-4 for dense data correlation. Use grid-cols-1 md:grid-cols-2 xl:grid-cols-4 for KPI cards.",
+      "kanban_board": "Horizontal flex container with gap-6. Columns should have min-w-[320px] and subtle gray bg (#F3F4F6) with no borders.",
+      "padding": "Use generous padding (p-8) for page containers. Table cells should use compact padding (py-3 px-4) to maximize data visibility."
+    }
+  },
+  "components": {
+    "cards": {
+      "style": "Flat solid surfaces. 1px border (#E5E7EB). rounded-xl. NO ambient drop shadows by default. Add shadow-sm ONLY on hover for interactive cards (like Kanban items).",
+      "header": "Border-bottom (border-b) inside cards to separate title from content cleanly."
+    },
+    "tables": {
+      "style": "High-density. sticky header. Use alternating row colors (bg-white and bg-gray-50/50) or simple bottom borders.",
+      "actions": "Hover-to-reveal action buttons (Edit/Delete) on the right side of rows."
+    },
+    "tabs": {
+      "style": "Pill-shaped tabs (bg-gray-100, text-gray-600, active: bg-white text-emerald-800 shadow-sm) instead of standard underlines. Perfect for Customer Profile (Genel Bakış, Ölçümler, vb.)."
+    },
+    "badges": {
+      "style": "Soft background + dark text. E.g., Follow-up task (bg-amber-100 text-amber-800), Graduate (bg-emerald-100 text-emerald-800)."
+    }
+  },
+  "visual_enhancers": {
+    "icons": "Use @phosphor-icons/react (Duotone or Regular weight). They look professional and clinical.",
+    "borders": "Use 'Grid Borders' concept for the Dashboard KPI section to make it look structural and data-heavy.",
+    "empty_states": "Do not show blank screens. Show a soft, muted icon with 'Henüz veri yok' (No data yet) and a clear 'Yeni Ekle' (Add New) button."
+  },
+  "motion": {
+    "interactions": "Micro-interactions only. Hover states must change background or border color. Buttons should have active:scale-95.",
+    "kanban": "Smooth transform on drag. Add a slight rotation (rotate-1) and shadow-lg when a Kanban card is being dragged."
+  },
+  "accessibility": {
+    "contrast": "Ensure #065F46 on #FFFFFF exceeds APCA standards. All muted text must be at least #6B7280.",
+    "testing": "All interactive elements MUST have data-testid attributes (e.g., data-testid='lead-kanban-card', data-testid='add-customer-btn')."
+  },
+  "images": {
+    "consultant_avatar": {
+      "url": "https://images.unsplash.com/photo-1585358682246-23acb1561f6b?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NDQ2NDN8MHwxfHNlYXJjaHwxfHxudXRyaXRpb25pc3QlMjBjb25zdWx0YW50JTIwcG9ydHJhaXR8ZW58MHx8fHwxNzg3OTk1OTE3fDA&ixlib=rb-4.1.0&q=85",
+      "usage": "Use as the placeholder avatar for the 'Danışman' (Consultant) profile in the top-right header or settings page."
+    },
+    "product_thumbnail": {
+      "url": "https://images.unsplash.com/photo-1704694671866-f83e0b91df09?crop=entropy&cs=srgb&fm=jpg&ixid=M3w3NTY2Nzd8MHwxfHNlYXJjaHwzfHxmaXRuZXNzJTIwaGVhbHRoJTIwcHJvZHVjdHMlMjBzdXBwbGVtZW50c3xlbnwwfHx8fDE3ODc5OTU5MTd8MA&ixlib=rb-4.1.0&q=85",
+      "usage": "Use as a placeholder image for the 'Ürünler' (Products) catalog module."
+    }
+  },
+  "instructions_to_main_agent": [
+    "Use react-beautiful-dnd or @hello-pangea/dnd for the Kanban pipeline (Potansiyel Müşteriler).",
+    "Use recharts for the 'Raporlar' (Reports) module. Apply the custom chart_palette provided.",
+    "Ensure all text is in Turkish as requested (Potansiyel Müşteriler, Aktif Müşteriler, vb.).",
+    "Install and use @phosphor-icons/react for all icons.",
+    "Update tailwind.config.js and index.css with the exact colors from this JSON.",
+    "Implement Shadcn UI components but strip away the default 'Vercel' look; apply the flat, 1px border style specified here.",
+    "Do NOT center align the main app container. It's a dashboard, it should stretch to full width/height.",
+    "Use sonner for toast notifications (e.g., Duplicate check warnings, task completions)."
+  ]
+}

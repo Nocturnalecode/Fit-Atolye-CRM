@@ -1,0 +1,69 @@
+{
+  "summary": "Backend-only testing of FitAtolye CRM (FastAPI + MongoDB) via public URL (REACT_APP_BACKEND_URL). Built a pytest suite (91 tests, 5 files) covering auth/JWT/RBAC, reference data, persons (leads/customers/graduates), duplicate detection, bulk-assign, contacts + auto follow-up tasks, tasks, appointments, lead->customer conversion (peşin & 4w installment plans), memberships (freeze/refund/graduation), payments (overdue -> Gecikmiş), measurements, product sales, financial summary, dashboard, reports KPI, Excel/PDF export, targets, users and settings. Result: 81 passed, 9 failed, 1 skipped (90% pass). Every requested feature in the review request works as specified; all failures are security/robustness gaps found in extra hardening + playbook checks. No API returned an unexpected 500 except /api/ref/{unknown_kind}.",
+  "backend_issues": {
+    "critical": [
+      {"endpoint": "GET /api/ref/{kind}", "issue": "Unknown kind raises unhandled KeyError -> HTTP 500 (traceback in backend.err.log). _ref_collection() must validate kind and raise 404/400.", "priority": "HIGH"},
+      {"endpoint": "PATCH|DELETE /api/tasks/{tid}", "issue": "No ownership/role check: a consultant can edit and delete tasks assigned to other users (returns 200). Also no 404 for unknown task id - PATCH on a non-existent id returns 200 with body null.", "priority": "HIGH"},
+      {"endpoint": "GET /api/dashboard (consultant)", "issue": "by_source / by_stage / by_negative_reason are computed from db.persons.find({}) with no role filter, so a consultant sees org-wide aggregates (12 persons charted vs 7 own). Data leak; counters (active_customers/tasks) are correctly scoped.", "priority": "HIGH"},
+      {"endpoint": "CORS middleware", "issue": "allow_origins=[\"*\"] together with allow_credentials=True; Starlette reflects any Origin (evil.example.com) with Access-Control-Allow-Credentials:true. CORS_ORIGINS env var exists in backend/.env but is unused. Use an explicit origin list.", "priority": "HIGH"},
+      {"endpoint": "POST /api/auth/login", "issue": "No brute-force protection: 6+ consecutive wrong passwords all return 401, no lockout/throttle (expected 423/429 after 5 fails).", "priority": "HIGH"}
+    ],
+    "minor": [
+      {"endpoint": "POST /api/auth/logout", "issue": "Documented in /app/memory/test_credentials.md but not implemented (404)."},
+      {"endpoint": "POST /api/auth/login", "issue": "No httpOnly access_token cookie is set even though auth.get_current_user falls back to request.cookies['access_token'] - dead code path. (Acceptable if bearer-only was intended, but the cookie fallback should then be removed.)"},
+      {"endpoint": "GET /api/users", "issue": "Any authenticated user (consultant) can list all users incl. emails/roles. Should be admin-only or return a minimal name/id projection."},
+      {"endpoint": "GET /api/payments, GET /api/memberships, GET /api/product-sales", "issue": "No role scoping when person_id is omitted - a consultant can read all financial records of the whole company (test asserts scoping only for payments and it passes today only because seeded customers belong to the test consultant; verified by code review)."},
+      {"endpoint": "PATCH|DELETE /api/appointments/{aid}, PATCH /api/payments/{pid}, PATCH|DELETE /api/measurements/{mid}", "issue": "No ownership check and no 404 on unknown id; PATCH returns 200/null for non-existent records."},
+      {"endpoint": "GET /api/payments", "issue": "Overdue status is only patched in the response payload, never persisted, and reads p['status']/p['due_date'] with [] indexing (KeyError risk on legacy docs)."},
+      {"endpoint": "PATCH /api/persons/{pid}, PATCH /api/tasks/{tid}", "issue": "Update dicts drop None values, so fields can never be cleared (e.g. next_followup_date, negative_reason_id, person_id)."},
+      {"endpoint": "GET /api/reports/kpi", "issue": "new_leads counts every person (incl. customers/graduates) and new_memberships counts ALL memberships ignoring user_id/date filters, so conversion_rate and new_memberships are misleading."},
+      {"endpoint": "POST /api/ref/{kind}", "issue": "Body typed as raw Dict[str, Any] - no Pydantic validation; caller can inject arbitrary fields/override id semantics."},
+      {"endpoint": "DELETE /api/persons, DELETE /api/products", "issue": "No delete endpoints exist (only archive/active flags) - test data must be cleaned directly in Mongo."}
+    ]
+  },
+  "frontend_issues": {"ui_bugs": [], "integration_issues": [], "design_issues": []},
+  "test_report_links": [
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/test_auth.py",
+    "/app/backend/tests/test_reference_settings.py",
+    "/app/backend/tests/test_persons.py",
+    "/app/backend/tests/test_contacts_tasks.py",
+    "/app/backend/tests/test_lifecycle_finance.py",
+    "/app/backend/tests/test_dashboard_reports.py",
+    "/app/test_reports/pytest/pytest_results.xml"
+  ],
+  "action_items": [
+    "Validate kind in _ref_collection() and raise HTTPException(404) instead of letting KeyError bubble to a 500.",
+    "Add ownership/role checks + 404-on-missing for PATCH/DELETE of tasks, appointments, payments and measurements.",
+    "Scope dashboard by_source/by_stage/by_negative_reason (and list endpoints for payments/memberships/product-sales) to the consultant's own persons.",
+    "Replace CORS allow_origins=['*'] with the explicit CORS_ORIGINS list from backend/.env (required because allow_credentials=True).",
+    "Add login brute-force lockout (e.g. 5 failed attempts -> 423/429 with cooldown).",
+    "Implement POST /api/auth/logout (or remove it from test_credentials.md) and either set the httpOnly cookie on login or remove the cookie fallback in auth.get_current_user.",
+    "Restrict GET /api/users to admin (or return a minimal projection).",
+    "Fix /api/reports/kpi: new_leads should count leads only; new_memberships must respect user_id/date filters.",
+    "Split server.py (1218 lines) into modules - the empty /app/backend/routes package already exists."
+  ],
+  "critical_code_review_comments": [
+    "server.py is 1218 lines with all routes/models in one file; /app/backend/routes/ is empty - split by domain (auth, persons, finance, reports).",
+    "_ref_collection uses a dict lookup with no guard -> guaranteed 500 on any unknown path segment.",
+    "Several PATCH handlers build `{k: v for k, v in body.model_dump().items() if v is not None}` and then update without first verifying the document exists, so unknown ids silently return null with 200.",
+    "auth.py get_current_user supports a cookie token that login never issues; decide on one transport.",
+    "Positive: bcrypt hashes are $2b$12$ (60 chars), passwords/_id are never leaked in responses, JWT_SECRET comes from env, seed_admin re-syncs the admin password when ADMIN_PASSWORD changes, and all Mongo access is async via motor."
+  ],
+  "updated_files": [
+    "/app/backend/tests/conftest.py",
+    "/app/backend/tests/test_auth.py",
+    "/app/backend/tests/test_reference_settings.py",
+    "/app/backend/tests/test_persons.py",
+    "/app/backend/tests/test_contacts_tasks.py",
+    "/app/backend/tests/test_lifecycle_finance.py",
+    "/app/backend/tests/test_dashboard_reports.py"
+  ],
+  "success_rate": {"backend": "90% (81/90 executed, 1 skipped)", "frontend": "not tested (backend-only request)"},
+  "seed_data_creation": "Tests create TEST_-prefixed persons/leads/customers, memberships, payments, measurements, product sales, contacts, tasks, appointments, a TEST_ product and a year-2099 target. All are removed by class-scoped teardown fixtures (verified: 0 leftovers after run). Phone numbers are randomized per run to avoid duplicate-detection collisions.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "test_credentials": "Admin armaganesralife@gmail.com / Admin123! (role=admin), Consultant ayse@fitatolye.com / Danisman123! (role=consultant) - both verified working via POST /api/auth/login",
+  "context_for_next_testing_agent": "Backend suite lives in /app/backend/tests (pytest.ini uses -n 2 --dist loadscope; keep shared state inside a single class). Run: cd /app/backend && python -m pytest tests/ -v --junitxml=/app/test_reports/pytest/pytest_results.xml. Fixtures: admin/consultant/anon sessions, cleanup_persons, cleanup_misc, uniq_phone(), d(days). All 20 features from the review request were verified PASSING: admin+consultant login/roles, dashboard payload, 9 seeded leads with consultant scoping, all 5 ref endpoints, person create validation (400 without phone+instagram) and duplicate flag, bulk-assign, consultant reassign 403, contact -> auto follow-up task (Ulaşılamadı => task at +1 day for the person's consultant), convert with end_date=+30d and peşin=1 / 4w=4 installments (sum preserved, due dates +0/+7/+14/+21), measurement 400 for lead, product-sale 400 for lead + consultant scoping, financial summary math, product admin-only 403, overdue payment => Gecikmiş, freeze_days=7 extends end_date, 'Mezun edildi' => lifecycle graduate, KPI keys, Excel(PK/xlsx) + PDF(%PDF) exports, settings admin-only PATCH, task/appointment CRUD. The 9 failures are all real defects listed in backend_issues; one test skips when no customer is assigned to a consultant other than ayse. Frontend was NOT tested.",
+  "rca_of_the_issue": "1) /api/ref/{kind} 500: _ref_collection() indexes a literal dict with the raw path param, so any unknown kind raises KeyError (confirmed in /var/log/supervisor/backend.err.log). 2) Task/appointment/payment/measurement PATCH+DELETE handlers never load the document before updating and never compare assigned_to with current_user, hence cross-tenant writes succeed with 200 and unknown ids return null. 3) Dashboard chart aggregation queries db.persons.find({}) unconditionally while only the scalar counters apply the role filter, leaking org-wide distribution to consultants. 4) CORS: Starlette echoes the request Origin when '*' is combined with allow_credentials=True, effectively allowing credentialed cross-site requests from any origin; backend/.env already exposes CORS_ORIGINS but it is never read."
+}

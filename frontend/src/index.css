@@ -1,0 +1,107 @@
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 20% 98%;
+    --foreground: 220 26% 12%;
+    --card: 0 0% 100%;
+    --card-foreground: 220 26% 12%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 220 26% 12%;
+    --primary: 158 84% 20%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 210 20% 96%;
+    --secondary-foreground: 220 26% 12%;
+    --muted: 210 20% 96%;
+    --muted-foreground: 220 9% 46%;
+    --accent: 160 84% 32%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 158 84% 20%;
+    --chart-1: 158 84% 20%;
+    --chart-2: 174 84% 32%;
+    --chart-3: 158 64% 52%;
+    --chart-4: 152 76% 80%;
+    --chart-5: 38 92% 50%;
+    --radius: 0.75rem;
+  }
+}
+
+* { border-color: hsl(var(--border)); }
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: 'IBM Plex Sans', system-ui, sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, h4, .heading {
+  font-family: 'Manrope', system-ui, sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.kanban-scroll::-webkit-scrollbar { height: 10px; }
+.kanban-scroll::-webkit-scrollbar-thumb { background: #E5E7EB; border-radius: 8px; }
+
+.sidebar-item {
+  display: flex; align-items: center; gap: 0.75rem;
+  padding: 0.625rem 0.875rem; border-radius: 0.5rem;
+  font-size: 0.875rem; color: #374151; font-weight: 500;
+  transition: background-color 0.15s, color 0.15s;
+}
+.sidebar-item:hover { background: #F3F4F6; color: #065F46; }
+.sidebar-item.active {
+  background: #ECFDF5; color: #065F46; font-weight: 600;
+}
+.sidebar-item.active svg { color: #065F46; }
+
+.kpi-card {
+  background: #fff; border: 1px solid #E5E7EB; border-radius: 12px;
+  padding: 1.25rem;
+}
+.kpi-value { font-family: 'Manrope', sans-serif; font-weight: 800; font-size: 1.75rem; letter-spacing: -0.02em; color: #111827; }
+.kpi-label { font-size: 0.8125rem; color: #6B7280; font-weight: 500; }
+
+.badge-soft { display: inline-flex; align-items: center; padding: 0.125rem 0.625rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500; }
+
+.pill-tabs { background: #F3F4F6; padding: 4px; border-radius: 9999px; display: inline-flex; gap: 4px; flex-wrap: wrap; }
+.pill-tabs button { padding: 6px 14px; border-radius: 9999px; font-size: 0.8125rem; color: #4B5563; font-weight: 500; }
+.pill-tabs button.active { background: #fff; color: #065F46; box-shadow: 0 1px 2px rgba(0,0,0,0.06); font-weight: 600; }
+
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }
+.data-table thead th { text-align: left; padding: 0.625rem 1rem; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: #6B7280; border-bottom: 1px solid #E5E7EB; background: #F9FAFB; }
+.data-table tbody td { padding: 0.75rem 1rem; border-bottom: 1px solid #F3F4F6; color: #111827; }
+.data-table tbody tr:hover { background: #FAFBFC; }
+
+.kanban-card { background:#fff; border:1px solid #E5E7EB; border-radius:10px; padding:0.75rem; margin-bottom:0.5rem; transition: box-shadow 0.15s, transform 0.15s;  }
+.kanban-card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+.kanban-card.dragging { transform: rotate(1deg); box-shadow: 0 12px 24px rgba(0,0,0,0.12); }
+
+.btn-primary {
+  background: #065F46; color: #fff; padding: 0.5rem 1rem; border-radius: 0.5rem;
+  font-size: 0.875rem; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem;
+  transition: background 0.15s, transform 0.05s;
+}
+.btn-primary:hover { background: #047857; }
+.btn-primary:active { transform: scale(0.97); }
+
+.btn-ghost {
+  padding: 0.5rem 0.875rem; border-radius: 0.5rem;
+  font-size: 0.875rem; font-weight: 500; color: #374151;
+  display: inline-flex; align-items: center; gap: 0.5rem;
+  border: 1px solid #E5E7EB; background: #fff;
+}
+.btn-ghost:hover { background: #F9FAFB; }
