@@ -72,12 +72,6 @@ export default function Login() {
               Giriş Yap
             </button>
           </form>
-
-          <div className="mt-6 text-xs text-[#6B7280] bg-[#F9FAFB] rounded-lg p-3">
-            <div className="font-semibold text-[#374151] mb-1">Demo Hesaplar</div>
-            <div>Yönetici: armaganesralife@gmail.com / Admin123!</div>
-            <div>Danışman: ayse@fitatolye.com / Danisman123!</div>
-          </div>
         </div>
       </div>
     </div>
