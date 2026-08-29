@@ -66,7 +66,23 @@ export default function Settings() {
             {items.map((it) => (
               <div key={it.id} className="flex justify-between items-center p-3 border rounded-lg">
                 <span className={it.active ? "" : "text-[#9CA3AF] line-through"}>{it.name}</span>
-                <button className="btn-ghost text-xs" onClick={() => toggle(it)}>{it.active ? "Pasife Al" : "Aktif Yap"}</button>
+                <div className="flex gap-3 items-center">
+                  <button className="btn-ghost text-xs" onClick={() => toggle(it)}>{it.active ? "Pasife Al" : "Aktif Yap"}</button>
+                  <button
+                    className="text-xs underline text-red-600 hover:text-red-800"
+                    data-testid={`delete-ref-${it.id}`}
+                    onClick={async () => {
+                      if (!window.confirm(`"${it.name}" kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.`)) return;
+                      try {
+                        await api.delete(`/ref/${active}/${it.id}`);
+                        toast.success("Silindi");
+                        load();
+                      } catch (e) {
+                        toast.error(formatError(e.response?.data?.detail));
+                      }
+                    }}
+                  >Sil</button>
+                </div>
               </div>
             ))}
           </div>
@@ -162,7 +178,11 @@ export default function Settings() {
                   </div>
                   <div className="flex gap-2 shrink-0">
                     <button className="text-xs underline" onClick={() => setWaEditing(t)} data-testid={`edit-wa-${t.id}`}>Düzenle</button>
-                    <button className="text-xs underline text-red-500" onClick={async () => { if (window.confirm("Silinsin mi?")) { await api.delete(`/wa-templates/${t.id}`); loadWa(); } }}>Sil</button>
+                    <button className="text-xs underline text-red-500" onClick={async () => {
+                      if (!window.confirm(`"${t.name}" şablonunu silmek istediğinize emin misiniz?`)) return;
+                      try { await api.delete(`/wa-templates/${t.id}`); toast.success("Silindi"); loadWa(); }
+                      catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+                    }} data-testid={`delete-wa-${t.id}`}>Sil</button>
                   </div>
                 </div>
                 <p className="text-xs text-[#6B7280]">{t.content}</p>

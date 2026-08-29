@@ -97,7 +97,12 @@ export default function CalendarTasks() {
                     <div className={`text-sm font-medium truncate ${t.done ? "line-through text-[#9CA3AF]" : ""}`}>{t.title}</div>
                     <div className="text-xs text-[#6B7280]">{formatDateTR(t.due_date)} {t.due_date < today && !t.done && <span className="text-red-600 font-medium">· Gecikmiş</span>}</div>
                   </div>
-                  <button onClick={async () => { await api.delete(`/tasks/${t.id}`); load(); }}><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
+                    <button onClick={async () => {
+                      if (!window.confirm(`"${t.title}" görevini silmek istediğinize emin misiniz?`)) return;
+                      await api.delete(`/tasks/${t.id}`);
+                      toast.success("Görev silindi");
+                      load();
+                    }} data-testid={`task-delete-${t.id}`}><Trash2 className="w-3.5 h-3.5 text-red-400" /></button>
                 </div>
               ))}
             </div>

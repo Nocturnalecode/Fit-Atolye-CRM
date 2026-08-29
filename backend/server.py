@@ -441,6 +441,16 @@ async def update_ref(kind: str, item_id: str, body: Dict[str, Any], current=Depe
     return doc
 
 
+@api.delete("/ref/{kind}/{item_id}")
+async def delete_ref(kind: str, item_id: str, current=Depends(current_user_dep)):
+    require_admin(current)
+    col = _ref_collection(kind)
+    r = await col.delete_one({"id": item_id})
+    if r.deleted_count == 0:
+        raise HTTPException(404, "Kayıt bulunamadı")
+    return {"ok": True}
+
+
 # --- Duplicate check ---
 async def check_duplicate(phone: Optional[str], instagram: Optional[str]) -> Optional[dict]:
     q = []

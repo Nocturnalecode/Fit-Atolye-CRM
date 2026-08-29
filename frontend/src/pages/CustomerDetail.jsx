@@ -193,7 +193,11 @@ export default function CustomerDetail() {
             <div><div className="text-sm font-medium">{s.product_name} × {s.qty}</div><div className="text-xs text-[#6B7280]">{formatDateTR(s.sale_date)} · {s.method}</div></div>
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold">{formatTRY(s.unit_price * s.qty)}</span>
-              <button onClick={async () => { if (window.confirm("Silinsin mi?")) { await api.delete(`/product-sales/${s.id}`); load(); } }}><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
+              <button onClick={async () => {
+                if (!window.confirm(`"${s.product_name}" satışını silmek istediğinize emin misiniz?`)) return;
+                try { await api.delete(`/product-sales/${s.id}`); toast.success("Silindi"); load(); }
+                catch (e) { toast.error(formatError(e.response?.data?.detail)); }
+              }} data-testid={`sale-delete-${s.id}`}><Trash2 className="w-3.5 h-3.5 text-red-500" /></button>
             </div>
           </div>
         )} empty="Satış yok." />
