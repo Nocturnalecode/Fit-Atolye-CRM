@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from "react-router-dom";
 import { api, formatError } from "../lib/api";
 import { formatDateTR, formatTRY, todayISO, useAuth, calcAge } from "../lib/auth";
 import { toast } from "sonner";
-import { ArrowLeft, Plus, Trash2, Users as UsersIcon, Star, Ticket, CheckCircle2, RotateCcw } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Users as UsersIcon, Star, Ticket, CheckCircle2, RotateCcw, Pencil } from "lucide-react";
 import ReferralPicker from "../components/ReferralPicker";
 import { ReferralBadge } from "../components/ReferralBadge";
 
@@ -27,10 +27,12 @@ export default function CustomerDetail() {
   const [referrerName, setReferrerName] = useState("");
   const [referrals, setReferrals] = useState([]);
   const [coupons, setCoupons] = useState([]);
+  const [users, setUsers] = useState([]);
   const [modal, setModal] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
 
   const load = async () => {
-    const [pr, f, m, py, me, ap, s, pr2, ct, src] = await Promise.all([
+    const [pr, f, m, py, me, ap, s, pr2, ct, src, us] = await Promise.all([
       api.get(`/persons/${id}`),
       api.get(`/persons/${id}/financial`).catch(() => ({ data: null })),
       api.get(`/memberships?person_id=${id}`),
@@ -41,10 +43,11 @@ export default function CustomerDetail() {
       api.get(`/products?active=true`),
       api.get(`/contacts?person_id=${id}`),
       api.get(`/ref/sources`),
+      api.get(`/users`).catch(() => ({ data: [] })),
     ]);
     setP(pr.data); setFin(f.data); setMemberships(m.data); setPayments(py.data);
     setMeasurements(me.data); setAppointments(ap.data); setSales(s.data);
-    setProducts(pr2.data); setContacts(ct.data); setSources(src.data);
+    setProducts(pr2.data); setContacts(ct.data); setSources(src.data); setUsers(us.data);
     // load who this person referred + their coupons
     try {
       const { data: refs } = await api.get(`/persons/${id}/referrals`);
@@ -100,9 +103,20 @@ export default function CustomerDetail() {
           </h1>
           <div className="text-sm text-[#6B7280] mt-1">{p.phone || "-"} · {p.instagram || ""}</div>
         </div>
-        <span className={`badge-soft ${p.lifecycle_status === "customer" ? "bg-emerald-100 text-emerald-800" : p.lifecycle_status === "graduate" ? "bg-purple-100 text-purple-800" : "bg-amber-100 text-amber-800"}`}>
-          {p.lifecycle_status === "customer" ? "Aktif Müşteri" : p.lifecycle_status === "graduate" ? "Mezun" : "Potansiyel"}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`badge-soft ${p.lifecycle_status === "customer" ? "bg-emerald-100 text-emerald-800" : p.lifecycle_status === "graduate" ? "bg-purple-100 text-purple-800" : "bg-amber-100 text-amber-800"}`}>
+            {p.lifecycle_status === "customer" ? "Aktif Müşteri" : p.lifecycle_status === "graduate" ? "Mezun" : "Potansiyel"}
+          </span>
+          {(isAdmin || p.assigned_to === user?.id) && (
+            <button
+              onClick={() => setEditOpen(true)}
+              className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-[#065F46] hover:bg-[#064e3b] rounded-lg px-3 py-1.5 transition"
+              data-testid="customer-edit-btn"
+            >
+              <Pencil className="w-3.5 h-3.5" /> Düzenle
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Summary cards */}
@@ -373,6 +387,7 @@ export default function CustomerDetail() {
       )}
 
       {modal && <QuickModal kind={modal.kind} personId={id} products={products} onClose={() => setModal(null)} onSaved={load} />}
+      {editOpen && <EditPersonModal person={p} users={users} isAdmin={isAdmin} onClose={() => setEditOpen(false)} onSaved={() => { setEditOpen(false); load(); }} />}
     </div>
   );
 }
@@ -471,3 +486,91 @@ function QuickModal({ kind, personId, products, onClose, onSaved }) {
   );
 }
 function F({ label, children }) { return <div><label className="block text-xs font-semibold mb-1">{label}</label>{children}</div>; }
+
+function EditPersonModal({ person, users, isAdmin, onClose, onSaved }) {
+  const [f, setF] = useState({
+    name: person.name || "",
+    phone: person.phone || "",
+    instagram: person.instagram || "",
+    birth_date: person.birth_date || "",
+    priority: person.priority || "normal",
+    assigned_to: person.assigned_to || "",
+    last_note: person.last_note || "",
+  });
+  const [saving, setSaving] = useState(false);
+  const submit = async () => {
+    if (!f.name.trim()) { toast.error("İsim boş olamaz"); return; }
+    if (!f.phone.trim() && !f.instagram.trim()) { toast.error("Telefon veya Instagram gerekli"); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        name: f.name.trim(),
+        phone: f.phone.trim() || null,
+        instagram: f.instagram.trim() || null,
+        birth_date: f.birth_date || null,
+        priority: f.priority,
+        last_note: f.last_note || null,
+      };
+      if (isAdmin) payload.assigned_to = f.assigned_to || null;
+      await api.patch(`/persons/${person.id}`, payload);
+      toast.success("Bilgiler güncellendi");
+      onSaved();
+    } catch (e) {
+      toast.error(formatError(e.response?.data?.detail) || "Güncelleme başarısız");
+    } finally {
+      setSaving(false);
+    }
+  };
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-2xl w-full max-w-lg p-6" onClick={(e) => e.stopPropagation()} data-testid="edit-person-modal">
+        <h2 className="font-bold text-lg mb-4" style={{fontFamily:'Manrope'}}>Müşteri Bilgilerini Düzenle</h2>
+        <div className="space-y-3">
+          <F label="Ad Soyad">
+            <input className="inp" value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} data-testid="edit-name" />
+          </F>
+          <div className="grid grid-cols-2 gap-3">
+            <F label="Telefon">
+              <input className="inp" value={f.phone} onChange={(e) => setF({ ...f, phone: e.target.value })} data-testid="edit-phone" />
+            </F>
+            <F label="Instagram">
+              <input className="inp" value={f.instagram} onChange={(e) => setF({ ...f, instagram: e.target.value })} data-testid="edit-instagram" />
+            </F>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <F label="Doğum Tarihi">
+              <input type="date" className="inp" value={f.birth_date} onChange={(e) => setF({ ...f, birth_date: e.target.value })} data-testid="edit-birth" />
+            </F>
+            <F label="Öncelik">
+              <select className="inp" value={f.priority} onChange={(e) => setF({ ...f, priority: e.target.value })} data-testid="edit-priority">
+                <option value="low">Düşük</option>
+                <option value="normal">Normal</option>
+                <option value="high">Yüksek</option>
+              </select>
+            </F>
+          </div>
+          {isAdmin && (
+            <F label="Beslenme Koçu">
+              <select className="inp" value={f.assigned_to} onChange={(e) => setF({ ...f, assigned_to: e.target.value })} data-testid="edit-assigned">
+                <option value="">— Atanmadı —</option>
+                {users.filter((u) => u.role === "consultant" && u.active !== false).map((u) => (
+                  <option key={u.id} value={u.id}>{u.name}</option>
+                ))}
+              </select>
+            </F>
+          )}
+          <F label="Genel Not">
+            <textarea className="inp" rows="2" value={f.last_note} onChange={(e) => setF({ ...f, last_note: e.target.value })} data-testid="edit-note" />
+          </F>
+        </div>
+        <div className="flex justify-end gap-2 mt-5">
+          <button className="btn-ghost" onClick={onClose} disabled={saving} data-testid="edit-cancel">İptal</button>
+          <button className="btn-primary" onClick={submit} disabled={saving} data-testid="edit-save">
+            {saving ? "Kaydediliyor..." : "Kaydet"}
+          </button>
+        </div>
+        <style>{`.inp{width:100%;padding:8px 12px;border:1px solid #E5E7EB;border-radius:8px;font-size:14px;outline:none}.inp:focus{border-color:#065F46}`}</style>
+      </div>
+    </div>
+  );
+}
